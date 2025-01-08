@@ -1,26 +1,30 @@
 import "./App.css";
-import React from "react";
+import React, { useState, useRef } from "react";
+import Header from "./components/Header/Header";
+
+import { MapContainer, TileLayer } from "react-leaflet";
+import osm from "./osm-providers";
+
 
 const Hero = () => {
+  const [center, setCenter] = useState({ lat: 41.40338, lng: 2.17403 });
+  const ZOOM_LEVEL = 9;
+  const mapRef = useRef();
+
   return (
-    <div className="hero">
-      {/* <div className="hero-content">
-        <h1>LaariKhojo</h1>
-        <p>Your Guide to Street Treasures!</p>
-      </div>  */} 
-      <div className="map-container">
-        {
-          <iframe
-          style={{ border: '1px solid rgba(0, 0, 0, 0.1)' }}
-            width="100%"
-            height="100%"
-            src="https://www.pampam.city/p/7bdQYZeWh7Q1cTckDKR2"
-            allowfullscreen
-            loading="lazy"
-          ></iframe>
-        }
-      </div>
-    </div>
+    <>
+        <Header title="Laari Khojo" />
+        <div className="row">
+          <div className="col">
+            <MapContainer center={center} zoom={ZOOM_LEVEL} scrollWheelZoom={true} style={{ height: "100vh", width: "100%" }} ref={mapRef}>
+              <TileLayer
+                url={osm.maptiler.url}
+                attribution={osm.maptiler.attribution}
+              />
+            </MapContainer>
+          </div>
+        </div>
+    </>
   );
 };
 
