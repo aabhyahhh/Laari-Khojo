@@ -4,6 +4,7 @@ import HomeScreen from "./components/HomeScreen";
 import Register from "./components/Register";
 import UpdateProfile from "./components/UpdateProfile";
 import Login from "./components/Login";
+import ImageUploadModal from "./components/ImageUploadModal";
 import laari from "./assets/logo_cropped.png";
 import logo from "./assets/logo.png";
 import { useEffect, useRef, useState } from "react";
@@ -36,6 +37,7 @@ interface Vendor {
   updatedAt?: string;
   foodType?: 'veg' | 'non-veg' | 'swaminarayan' | 'jain' | 'none';
   profilePicture?: string;
+  carouselImages?: string[];
   bestDishes?: Array<{ name: string; price?: number; menuLink?: string }>;
   latitude?: number;
   longitude?: number;
@@ -188,6 +190,10 @@ function MapDisplay() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showOnlyOpen, setShowOnlyOpen] = useState(false);
+
+  // Image upload modal states
+  const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+  const [uploadType, setUploadType] = useState<'profile' | 'carousel'>('profile');
 
   const navigate = useNavigate();
 
@@ -1891,37 +1897,69 @@ function MapDisplay() {
           
           <div style={{ padding: '20px 16px' }}>
             {/* Profile Picture and Name */}
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              {selectedVendor.profilePicture ? (
-                <img
-                  src={selectedVendor.profilePicture}
-                  alt={selectedVendor.name || 'Vendor'}
-                  style={{
+            <div style={{ textAlign: 'center', marginBottom: '20px', position: 'relative' }}>
+              <div 
+                onClick={() => {
+                  setUploadType('profile');
+                  setShowImageUploadModal(true);
+                }}
+                style={{ 
+                  cursor: 'pointer',
+                  position: 'relative',
+                  display: 'inline-block'
+                }}
+              >
+                {selectedVendor.profilePicture ? (
+                  <img
+                    src={selectedVendor.profilePicture}
+                    alt={selectedVendor.name || 'Vendor'}
+                    style={{
+                      width: '70px',
+                      height: '70px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '3px solid #eee',
+                      marginBottom: '8px',
+                    }}
+                  />
+                ) : (
+                  <div style={{
                     width: '70px',
                     height: '70px',
                     borderRadius: '50%',
-                    objectFit: 'cover',
-                    border: '3px solid #eee',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: '28px',
+                    fontWeight: 'bold',
                     marginBottom: '8px',
-                  }}
-                />
-              ) : (
+                  }}>
+                    {(selectedVendor.name?.charAt(0) || '?').toUpperCase()}
+                  </div>
+                )}
+                {/* Upload indicator */}
                 <div style={{
-                  width: '70px',
-                  height: '70px',
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  width: '20px',
+                  height: '20px',
+                  backgroundColor: '#007bff',
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  display: 'inline-flex',
+                  display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'white',
-                  fontSize: '28px',
+                  fontSize: '10px',
                   fontWeight: 'bold',
-                  marginBottom: '8px',
+                  border: '2px solid white',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                 }}>
-                  {(selectedVendor.name?.charAt(0) || '?').toUpperCase()}
+                  +
                 </div>
-              )}
+              </div>
               <h2 style={{ 
                 margin: '8px 0 4px 0', 
                 color: '#2c3e50', 
@@ -2031,6 +2069,43 @@ function MapDisplay() {
                   📞 Call
                 </a>
               )}
+            </div>
+
+            {/* Carousel Upload Button */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center',
+              marginBottom: '20px'
+            }}>
+              <button
+                onClick={() => {
+                  setUploadType('carousel');
+                  setShowImageUploadModal(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 16px',
+                  backgroundColor: '#ff6b6b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '500',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLButtonElement).style.backgroundColor = '#e55a5a';
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLButtonElement).style.backgroundColor = '#ff6b6b';
+                }}
+              >
+                📸 Add Laari Images
+              </button>
             </div>
 
             {/* Report Button */}
@@ -2706,6 +2781,13 @@ The user reports that this vendor is not present at the specified location.
           <path d="M16 6.5C10.2 6.5 5.5 11.2 5.5 17C5.5 18.7 6 20.3 6.8 21.7L5 27L10.4 25.2C11.7 25.9 13.3 26.5 15 26.5C20.8 26.5 25.5 21.8 25.5 16C25.5 11.2 20.8 6.5 16 6.5ZM15 24.5C13.5 24.5 12.1 24.1 10.9 23.4L10.6 23.2L7.5 24.2L8.5 21.1L8.3 20.8C7.5 19.5 7 18 7 16.5C7 12.4 10.4 9 14.5 9C18.6 9 22 12.4 22 16.5C22 20.6 18.6 24 14.5 24C14.3 24 14.1 24 14 24C14.3 24.2 14.6 24.4 15 24.5ZM19.2 18.7C18.9 18.6 17.7 18 17.4 17.9C17.1 17.8 16.9 17.8 16.7 18.1C16.5 18.3 16.2 18.7 16 18.9C15.8 19.1 15.6 19.1 15.3 19C14.2 18.6 13.2 17.7 12.6 16.7C12.5 16.4 12.6 16.2 12.8 16C13 15.8 13.2 15.5 13.3 15.3C13.4 15.1 13.4 14.9 13.3 14.7C13.2 14.5 12.7 13.3 12.5 12.8C12.3 12.3 12.1 12.3 11.9 12.3C11.7 12.3 11.5 12.3 11.3 12.3C11.1 12.3 10.8 12.4 10.7 12.6C10.2 13.2 10 14.1 10.2 15.1C10.5 16.7 11.7 18.2 13.2 19.1C14.7 20 16.5 20.2 18.1 19.7C19.1 19.4 20 18.8 20.6 18.3C20.8 18.2 20.9 18 20.9 17.8C20.9 17.6 20.8 17.4 20.7 17.3C20.6 17.2 20.5 17.1 20.3 17.1C20.1 17.1 19.5 17.1 19.2 18.7Z" fill="#fff"/>
         </svg>
       </a>
+
+      {/* Image Upload Modal */}
+      <ImageUploadModal
+        isOpen={showImageUploadModal}
+        onClose={() => setShowImageUploadModal(false)}
+        uploadType={uploadType}
+      />
     </div>
   );
 }

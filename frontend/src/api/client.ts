@@ -13,6 +13,7 @@ export interface Vendor {
   updatedAt?: string;
   foodType?: 'veg' | 'non-veg' | 'swaminarayan' | 'jain' | 'none';
   profilePicture?: string;
+  carouselImages?: string[];
   bestDishes?: Array<{ name: string; price?: number; menuLink?: string }>;
   category?: string[]; // Add category field for food categories
 }

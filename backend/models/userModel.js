@@ -31,7 +31,14 @@ const userSchema = new mongoose.Schema({
     operatingHours: {
         type: operatingHoursSchema,
         required: true
-      }
+    },
+    profilePicture: {
+        type: String,
+        default: null
+    },
+    carouselImages: [{
+        type: String
+    }]
 
 },{timestamps: true}
 );
