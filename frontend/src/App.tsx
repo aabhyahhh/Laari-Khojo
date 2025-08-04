@@ -474,59 +474,100 @@ function MapDisplay() {
     }
   };
 
+  // Helper function to validate coordinates are in Ahmedabad/Gandhinagar area
+  const isValidAhmedabadCoordinate = (latitude: number, longitude: number): boolean => {
+    // Ahmedabad/Gandhinagar area bounds
+    const MIN_LAT = 22.5;  // South boundary
+    const MAX_LAT = 23.5;  // North boundary
+    const MIN_LNG = 72.0;  // West boundary
+    const MAX_LNG = 73.0;  // East boundary
+    
+    const isValid = latitude >= MIN_LAT && latitude <= MAX_LAT && 
+                   longitude >= MIN_LNG && longitude <= MAX_LNG;
+    
+    if (!isValid) {
+      console.warn(`Invalid coordinates for Ahmedabad/Gandhinagar: ${latitude}, ${longitude}`);
+      console.warn(`Expected range: Lat ${MIN_LAT}-${MAX_LAT}, Lng ${MIN_LNG}-${MAX_LNG}`);
+    }
+    
+    return isValid;
+  };
+
   const extractCoordinates = (mapsLink: string | undefined | null) => {
     // Check if mapsLink exists and is a string
     if (!mapsLink || typeof mapsLink !== 'string') {
       return null;
     }
+    
     try {
       console.log("Attempting to extract coordinates from:", mapsLink);
 
-      // Prefer !3d...!4d... pattern (actual place coordinates)
-      let match = mapsLink.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+      // Pattern 1: @lat,lng,zoom (most common format)
+      let match = mapsLink.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
       if (match) {
-        const coords = {
-          latitude: parseFloat(match[1]),
-          longitude: parseFloat(match[2]),
-        };
-        console.log("Extracted coordinates from !3d...!4d...:", coords);
-        return coords;
-      }
-
-      // Fallback to @lat,lng
-      match = mapsLink.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-      if (match) {
-        const coords = {
-          latitude: parseFloat(match[1]),
-          longitude: parseFloat(match[2]),
-        };
-        console.log("Extracted coordinates from @lat,lng:", coords);
-        return coords;
-      }
-
-      // Fallback to place/@lat,lng
-      match = mapsLink.match(/place\/.*\/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-        if (match) {
-          const coords = {
-            latitude: parseFloat(match[1]),
-            longitude: parseFloat(match[2]),
-          };
-        console.log("Extracted coordinates from place/@lat,lng:", coords);
+        const latitude = parseFloat(match[1]);
+        const longitude = parseFloat(match[2]);
+        
+        // Validate coordinates are in Ahmedabad/Gandhinagar area
+        if (isValidAhmedabadCoordinate(latitude, longitude)) {
+          const coords = { latitude, longitude };
+          console.log("Extracted coordinates from @lat,lng:", coords);
           return coords;
+        } else {
+          console.warn("Coordinates outside Ahmedabad/Gandhinagar area:", { latitude, longitude });
+          return null;
         }
+      }
 
-      // Fallback to q=lat,lng
+      // Pattern 2: !3d...!4d... (alternate format)
+      match = mapsLink.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+      if (match) {
+        const latitude = parseFloat(match[1]);
+        const longitude = parseFloat(match[2]);
+        
+        if (isValidAhmedabadCoordinate(latitude, longitude)) {
+          const coords = { latitude, longitude };
+          console.log("Extracted coordinates from !3d...!4d...:", coords);
+          return coords;
+        } else {
+          console.warn("Coordinates outside Ahmedabad/Gandhinagar area:", { latitude, longitude });
+          return null;
+        }
+      }
+
+      // Pattern 3: place/.../@lat,lng
+      match = mapsLink.match(/place\/.*\/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (match) {
+        const latitude = parseFloat(match[1]);
+        const longitude = parseFloat(match[2]);
+        
+        if (isValidAhmedabadCoordinate(latitude, longitude)) {
+          const coords = { latitude, longitude };
+          console.log("Extracted coordinates from place/@lat,lng:", coords);
+          return coords;
+        } else {
+          console.warn("Coordinates outside Ahmedabad/Gandhinagar area:", { latitude, longitude });
+          return null;
+        }
+      }
+
+      // Pattern 4: q=lat,lng
       match = mapsLink.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
       if (match) {
-        const coords = {
-          latitude: parseFloat(match[1]),
-          longitude: parseFloat(match[2]),
-        };
-        console.log("Extracted coordinates from q=lat,lng:", coords);
-        return coords;
+        const latitude = parseFloat(match[1]);
+        const longitude = parseFloat(match[2]);
+        
+        if (isValidAhmedabadCoordinate(latitude, longitude)) {
+          const coords = { latitude, longitude };
+          console.log("Extracted coordinates from q=lat,lng:", coords);
+          return coords;
+        } else {
+          console.warn("Coordinates outside Ahmedabad/Gandhinagar area:", { latitude, longitude });
+          return null;
+        }
       }
 
-      console.error("No coordinates found in URL");
+      console.error("No valid coordinates found in URL");
       return null;
     } catch (error) {
       console.error("Error extracting coordinates:", error);
@@ -1298,17 +1339,29 @@ function MapDisplay() {
       const coords = extractCoordinates(vendor.mapsLink);
       if (coords) return coords;
     }
-    // 2. Try latitude/longitude fields
+    
+    // 2. Try latitude/longitude fields (with validation)
     if (typeof vendor.latitude === 'number' && typeof vendor.longitude === 'number') {
-      return { latitude: vendor.latitude, longitude: vendor.longitude };
+      if (isValidAhmedabadCoordinate(vendor.latitude, vendor.longitude)) {
+        return { latitude: vendor.latitude, longitude: vendor.longitude };
+      } else {
+        console.warn(`Vendor ${vendor.name} has invalid coordinates: ${vendor.latitude}, ${vendor.longitude}`);
+      }
     }
+    
     // 3. Try location.coordinates (WhatsApp pin)
     if ((vendor as any).location && Array.isArray((vendor as any).location.coordinates) && (vendor as any).location.coordinates.length === 2) {
-      return {
-        latitude: (vendor as any).location.coordinates[1],
-        longitude: (vendor as any).location.coordinates[0],
-      };
+      const lat = (vendor as any).location.coordinates[1];
+      const lng = (vendor as any).location.coordinates[0];
+      
+      if (isValidAhmedabadCoordinate(lat, lng)) {
+        return { latitude: lat, longitude: lng };
+      } else {
+        console.warn(`Vendor ${vendor.name} has invalid location coordinates: ${lat}, ${lng}`);
+      }
     }
+    
+    console.warn(`No valid coordinates found for vendor: ${vendor.name}`);
     return null;
   };
 

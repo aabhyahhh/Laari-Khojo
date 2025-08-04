@@ -1,10 +1,41 @@
 const twilio = require('twilio');
 
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+// Validate environment variables
+const validateTwilioConfig = () => {
+  const requiredVars = [
+    'TWILIO_ACCOUNT_SID',
+    'TWILIO_AUTH_TOKEN',
+    'TWILIO_WHATSAPP_NUMBER'
+  ];
+  
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missingVars.length > 0) {
+    console.error('❌ Missing Twilio environment variables:', missingVars);
+    console.error('Please check your .env file or environment configuration');
+    return false;
+  }
+  
+  console.log('✅ Twilio environment variables validated');
+  return true;
+};
+
+// Initialize Twilio client with validation
+let twilioClient = null;
+
+try {
+  if (validateTwilioConfig()) {
+    twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+    console.log('✅ Twilio client initialized successfully');
+  } else {
+    console.error('❌ Failed to initialize Twilio client due to missing environment variables');
+  }
+} catch (error) {
+  console.error('❌ Error initializing Twilio client:', error.message);
+}
 
 // Helper function to format phone number to international format
 const formatPhoneNumber = (phoneNumber) => {
@@ -45,10 +76,17 @@ const formatPhoneNumber = (phoneNumber) => {
 
 const sendWhatsAppMessage = async (to, message) => {
   try {
+    if (!twilioClient) {
+      throw new Error('Twilio client not initialized. Check environment variables.');
+    }
+    
     const formattedNumber = formatPhoneNumber(to);
     if (!formattedNumber) {
       throw new Error('Invalid phone number format');
     }
+    
+    console.log('📤 Sending WhatsApp message to:', formattedNumber);
+    console.log('📝 Message:', message);
     
     const response = await twilioClient.messages.create({
       body: message,
@@ -56,10 +94,11 @@ const sendWhatsAppMessage = async (to, message) => {
       to: `whatsapp:${formattedNumber}`
     });
 
-    console.log('Message sent successfully:', response.sid);
+    console.log('✅ Message sent successfully:', response.sid);
     return response;
   } catch (error) {
-    console.error('Error sending WhatsApp message:', error.message);
+    console.error('❌ Error sending WhatsApp message:', error.message);
+    console.error('❌ Error details:', error);
     throw error;
   }
 };
@@ -67,10 +106,18 @@ const sendWhatsAppMessage = async (to, message) => {
 // Send WhatsApp template message with variables
 const sendWhatsAppTemplateMessage = async (to, templateId, variables) => {
   try {
+    if (!twilioClient) {
+      throw new Error('Twilio client not initialized. Check environment variables.');
+    }
+    
     const formattedNumber = formatPhoneNumber(to);
     if (!formattedNumber) {
       throw new Error('Invalid phone number format');
     }
+    
+    console.log('📤 Sending WhatsApp template message to:', formattedNumber);
+    console.log('📝 Template ID:', templateId);
+    console.log('📊 Variables:', variables);
     
     const response = await twilioClient.messages.create({
       from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
@@ -79,10 +126,11 @@ const sendWhatsAppTemplateMessage = async (to, templateId, variables) => {
       contentVariables: JSON.stringify(variables)
     });
 
-    console.log('Template message sent successfully:', response.sid);
+    console.log('✅ Template message sent successfully:', response.sid);
     return response;
   } catch (error) {
-    console.error('Error sending WhatsApp template message:', error.message);
+    console.error('❌ Error sending WhatsApp template message:', error.message);
+    console.error('❌ Error details:', error);
     throw error;
   }
 };
@@ -90,9 +138,9 @@ const sendWhatsAppTemplateMessage = async (to, templateId, variables) => {
 // Send review notification to vendor
 const sendReviewNotification = async (vendorPhoneNumber, reviewData) => {
   try {
-    console.log('Original phone number:', vendorPhoneNumber);
+    console.log('📱 Original phone number:', vendorPhoneNumber);
     const formattedNumber = formatPhoneNumber(vendorPhoneNumber);
-    console.log('Formatted phone number:', formattedNumber);
+    console.log('📱 Formatted phone number:', formattedNumber);
     
     const templateId = 'HX17af3999106bed9bceb08252052e989b';
     const variables = {
@@ -103,7 +151,7 @@ const sendReviewNotification = async (vendorPhoneNumber, reviewData) => {
 
     return await sendWhatsAppTemplateMessage(formattedNumber, templateId, variables);
   } catch (error) {
-    console.error('Error sending review notification:', error.message);
+    console.error('❌ Error sending review notification:', error.message);
     throw error;
   }
 };
@@ -124,5 +172,6 @@ module.exports = {
   sendWhatsAppTemplateMessage,
   sendReviewNotification,
   sendLocationConfirmation,
-  formatPhoneNumber
+  formatPhoneNumber,
+  validateTwilioConfig
 }; 
