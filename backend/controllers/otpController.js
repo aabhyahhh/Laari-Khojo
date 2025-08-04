@@ -27,8 +27,14 @@ const sendOTP = async (req, res) => {
       });
     }
 
+    // Normalize phone number - ensure it has +91 prefix
+    let normalizedPhoneNumber = phoneNumber;
+    if (!phoneNumber.startsWith('+91')) {
+      normalizedPhoneNumber = `+91${phoneNumber}`;
+    }
+
     // Check if vendor exists with this phone number
-    const vendor = await User.findOne({ contactNumber: phoneNumber });
+    const vendor = await User.findOne({ contactNumber: normalizedPhoneNumber });
     
     if (!vendor) {
       return res.status(404).json({
@@ -41,7 +47,7 @@ const sendOTP = async (req, res) => {
     const otp = generateOTP();
     
     // Store OTP with expiration (5 minutes)
-    otpStore.set(phoneNumber, {
+    otpStore.set(normalizedPhoneNumber, {
       otp,
       expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
     });
@@ -51,13 +57,13 @@ const sendOTP = async (req, res) => {
       try {
         const messageConfig = {
           body: `Your LaariKhojo verification code is: ${otp}. Valid for 5 minutes.`,
-          to: phoneNumber
+          to: normalizedPhoneNumber
         };
 
         if (method === 'whatsapp') {
           // Send via WhatsApp
           messageConfig.from = `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`;
-          messageConfig.to = `whatsapp:${phoneNumber}`;
+          messageConfig.to = `whatsapp:${normalizedPhoneNumber}`;
         } else {
           // Send via SMS
           messageConfig.from = process.env.TWILIO_PHONE_NUMBER;
@@ -73,14 +79,14 @@ const sendOTP = async (req, res) => {
       }
     } else {
       // In development, just log the OTP
-      console.log(`Development OTP for ${phoneNumber} (${method}): ${otp}`);
+      console.log(`Development OTP for ${normalizedPhoneNumber} (${method}): ${otp}`);
     }
 
     return res.status(200).json({
       success: true,
       msg: `OTP sent successfully via ${method}`,
       data: {
-        phoneNumber,
+        phoneNumber: normalizedPhoneNumber,
         method,
         // In development, include OTP for testing
         ...(process.env.NODE_ENV !== 'production' && { otp })
@@ -109,8 +115,14 @@ const verifyOTP = async (req, res) => {
       });
     }
 
+    // Normalize phone number - ensure it has +91 prefix
+    let normalizedPhoneNumber = phoneNumber;
+    if (!phoneNumber.startsWith('+91')) {
+      normalizedPhoneNumber = `+91${phoneNumber}`;
+    }
+
     // Get stored OTP data
-    const storedData = otpStore.get(phoneNumber);
+    const storedData = otpStore.get(normalizedPhoneNumber);
     
     if (!storedData) {
       return res.status(400).json({
@@ -121,7 +133,7 @@ const verifyOTP = async (req, res) => {
 
     // Check if OTP is expired
     if (Date.now() > storedData.expiresAt) {
-      otpStore.delete(phoneNumber);
+      otpStore.delete(normalizedPhoneNumber);
       return res.status(400).json({
         success: false,
         msg: "OTP has expired. Please request a new OTP."
@@ -137,7 +149,7 @@ const verifyOTP = async (req, res) => {
     }
 
     // Get vendor data
-    const vendor = await User.findOne({ contactNumber: phoneNumber });
+    const vendor = await User.findOne({ contactNumber: normalizedPhoneNumber });
     
     if (!vendor) {
       return res.status(404).json({
@@ -147,7 +159,7 @@ const verifyOTP = async (req, res) => {
     }
 
     // Clear OTP from store
-    otpStore.delete(phoneNumber);
+    otpStore.delete(normalizedPhoneNumber);
 
     // Generate vendor token (simple session token)
     const vendorToken = require('crypto').randomBytes(32).toString('hex');

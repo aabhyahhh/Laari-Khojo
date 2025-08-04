@@ -1,6 +1,12 @@
 const VERIFY_TOKEN = "laarik";
 const VendorLocation = require('../models/vendorLocationModel');
-const { sendLocationConfirmation } = require('../services/whatsappService');
+const twilio = require('twilio');
+
+// Initialize Twilio client
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 const verifyWebhook = (req, res) => {
   const mode = req.query['hub.mode'];
@@ -24,6 +30,28 @@ const verifyWebhook = (req, res) => {
       tokenMatch: token === VERIFY_TOKEN
     });
     res.sendStatus(403);
+  }
+};
+
+const sendLocationConfirmation = async (to, latitude, longitude) => {
+  try {
+    const message = `Thank you for sharing your location! Your coordinates have been updated:
+Latitude: ${latitude}
+Longitude: ${longitude}
+
+You can update your location anytime by sending a new location.`;
+
+    const response = await twilioClient.messages.create({
+      body: message,
+      from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+      to: `whatsapp:${to}`
+    });
+
+    console.log('Location confirmation sent successfully:', response.sid);
+    return response;
+  } catch (error) {
+    console.error('Error sending location confirmation:', error);
+    throw error;
   }
 };
 
@@ -63,7 +91,24 @@ const handleWebhook = async (req, res) => {
   console.log('Received webhook:', JSON.stringify(body, null, 2));
 
   try {
-    // Check if this is a message event
+    // Handle Twilio webhook format
+    if (body.Body && body.From) {
+      const message = {
+        from: body.From.replace('whatsapp:', ''),
+        type: 'text',
+        text: { body: body.Body }
+      };
+
+      // Check if this is a location message (Twilio doesn't directly support location messages)
+      // You might need to handle this differently based on your requirements
+      console.log('Received message from Twilio:', message);
+      
+      // For now, just acknowledge the message
+      res.status(200).send('OK');
+      return;
+    }
+
+    // Handle Meta WhatsApp Business API format (if you switch to it later)
     if (body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages) {
       const messages = body.entry[0].changes[0].value.messages;
 

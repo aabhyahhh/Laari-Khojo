@@ -124,7 +124,12 @@ const HomeScreen: React.FC = () => {
     return R * c;
   };
 
-  const extractCoordinates = (mapsLink: string) => {
+  const extractCoordinates = (mapsLink: string | undefined | null) => {
+    // Check if mapsLink exists and is a string
+    if (!mapsLink || typeof mapsLink !== 'string') {
+      return null;
+    }
+    
     // Try !3d...!4d... pattern
     let match = mapsLink.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
     if (match) {

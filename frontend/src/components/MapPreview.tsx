@@ -12,6 +12,7 @@ import 'leaflet/dist/leaflet.css';
 import './MapPreview.css';
 import laari from '../assets/logo_cropped.png';
 import api, { Review } from '../api/client';
+import ReportLocationModal from './ReportLocationModal';
 
 interface Vendor {
   _id: string;
@@ -49,6 +50,9 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
   const [submitting, setSubmitting] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
+  // Report location modal states
+  const [showReportModal, setShowReportModal] = useState(false);
+
   // Helper function to convert time string to minutes from midnight (supports 24-hour and 12-hour AM/PM)
   const convertToMinutes = (timeStr: string): number => {
     // Try 24-hour format first
@@ -69,6 +73,22 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
     return hours * 60 + minutes;
     }
     return 0; // fallback
+  };
+
+  // Helper function to get food type display info
+  const getFoodTypeDisplay = (foodType?: string) => {
+    switch (foodType) {
+      case 'veg':
+        return { color: '#28a745', text: 'Veg' };
+      case 'non-veg':
+        return { color: '#dc3545', text: 'Non-Veg' };
+      case 'swaminarayan':
+        return { color: '#6f42c1', text: 'Swaminarayan' };
+      case 'jain':
+        return { color: '#6f42c1', text: 'Jain' };
+      default:
+        return { color: '#6c757d', text: foodType || 'Food type not specified' };
+    }
   };
 
   const getOperatingStatus = (operatingHours?: Vendor['operatingHours']) => {
@@ -252,7 +272,12 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
         coords = { latitude: vendor.latitude, longitude: vendor.longitude };
       } else if (vendor.mapsLink) {
         // Extract coordinates from mapsLink
-        const extractCoordinates = (mapsLink: string) => {
+        const extractCoordinates = (mapsLink: string | undefined | null) => {
+          // Check if mapsLink exists and is a string
+          if (!mapsLink || typeof mapsLink !== 'string') {
+            return null;
+          }
+          
           try {
             const patterns = [
               /@(-?\d+\.\d+),(-?\d+\.\d+)/, // Standard format
@@ -522,14 +547,22 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
                 }}>
                   {selectedVendor.name || 'Not available'}
                 </h2>
-                <div style={{ 
-                  color: '#666', 
-                  marginBottom: '12px', 
-                  fontSize: '13px',
-                  fontWeight: '500'
-                }}>
-                  {selectedVendor.foodType || 'Not available'}
-                </div>
+                {/* Food Type Tag */}
+                {selectedVendor.foodType && (
+                  <div style={{
+                    display: 'inline-block',
+                    backgroundColor: getFoodTypeDisplay(selectedVendor.foodType).color,
+                    color: 'white',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    marginBottom: '12px',
+                    textAlign: 'center'
+                  }}>
+                    {getFoodTypeDisplay(selectedVendor.foodType).text}
+                  </div>
+                )}
               </div>
 
               {/* Operating Status */}
@@ -569,7 +602,12 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
                   // Use vendor coordinates only (no userLocation in preview)
                   let vendorCoords = null;
                   if (selectedVendor.mapsLink) {
-                    const extractCoordinates = (mapsLink: string) => {
+                    const extractCoordinates = (mapsLink: string | undefined | null) => {
+                      // Check if mapsLink exists and is a string
+                      if (!mapsLink || typeof mapsLink !== 'string') {
+                        return null;
+                      }
+                      
                       const patterns = [
                         /@(-?\d+\.\d+),(-?\d+\.\d+)/,
                         /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
@@ -652,110 +690,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
                 marginBottom: '20px'
               }}>
                 <button
-                  onClick={() => {
-                    const extractCoordinates = (mapsLink: string) => {
-                      try {
-                        console.log("Attempting to extract coordinates from:", mapsLink);
-
-                        // Prefer !3d...!4d... pattern (actual place coordinates)
-                        let match = mapsLink.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
-                        if (match) {
-                          const coords = {
-                            latitude: parseFloat(match[1]),
-                            longitude: parseFloat(match[2]),
-                          };
-                          console.log("Extracted coordinates from !3d...!4d...:", coords);
-                          return coords;
-                        }
-
-                        // Fallback to @lat,lng
-                        match = mapsLink.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-                        if (match) {
-                          const coords = {
-                            latitude: parseFloat(match[1]),
-                            longitude: parseFloat(match[2]),
-                          };
-                          console.log("Extracted coordinates from @lat,lng:", coords);
-                          return coords;
-                        }
-
-                        // Fallback to place/@lat,lng
-                        match = mapsLink.match(/place\/.*\/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-                        if (match) {
-                          const coords = {
-                            latitude: parseFloat(match[1]),
-                            longitude: parseFloat(match[2]),
-                          };
-                          console.log("Extracted coordinates from place/@lat,lng:", coords);
-                          return coords;
-                        }
-
-                        // Fallback to q=lat,lng
-                        match = mapsLink.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-                        if (match) {
-                          const coords = {
-                            latitude: parseFloat(match[1]),
-                            longitude: parseFloat(match[2]),
-                          };
-                          console.log("Extracted coordinates from q=lat,lng:", coords);
-                          return coords;
-                        }
-
-                        console.error("No coordinates found in URL");
-                        return null;
-                      } catch (error) {
-                        console.error("Error extracting coordinates:", error);
-                        return null;
-                      }
-                    };
-
-                    const vendorCoords = extractCoordinates(selectedVendor.mapsLink);
-                    const reportData = {
-                      vendorName: selectedVendor.name || 'Unknown Vendor',
-                      vendorId: selectedVendor._id,
-                      vendorLocation: vendorCoords ? `${vendorCoords.latitude}, ${vendorCoords.longitude}` : 'Location not available',
-                      vendorArea: 'Area not specified',
-                      userLocation: 'User location not available',
-                      reportTime: new Date().toISOString(),
-                      subject: `Wrong Location Report - ${selectedVendor.name || 'Unknown Vendor'}`
-                    };
-
-                    // Create form data for Web3Forms
-                    const formData = new FormData();
-                    formData.append('access_key', 'd003bcfb-91bc-44d0-8347-1259bbc5158f');
-                    formData.append('subject', reportData.subject);
-                    formData.append('from_name', 'LaariKhojo User');
-                    formData.append('message', `
-Vendor Location Report
-
-Vendor Name: ${reportData.vendorName}
-Vendor ID: ${reportData.vendorId}
-Vendor Location: ${reportData.vendorLocation}
-Vendor Area: ${reportData.vendorArea}
-User Location: ${reportData.userLocation}
-Report Time: ${new Date(reportData.reportTime).toLocaleString()}
-
-The user reports that this vendor is not present at the specified location.
-                    `.trim());
-
-                    // Submit to Web3Forms
-                    fetch('https://api.web3forms.com/submit', {
-                      method: 'POST',
-                      body: formData
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                      if (data.success) {
-                        alert('Thank you for reporting! We will investigate this location issue.');
-                      } else {
-                        alert('Failed to submit report. Please try again.');
-                      }
-                    })
-                    .catch(error => {
-                      console.error('Error submitting report:', error);
-                      alert('Failed to submit report. Please try again.');
-                    });
-                  }}
+                  onClick={() => setShowReportModal(true)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -783,14 +718,7 @@ The user reports that this vendor is not present at the specified location.
               </div>
 
               {/* Contact Number */}
-              <div style={{ 
-                marginBottom: '16px', 
-                fontSize: '13px',
-                textAlign: 'center',
-                color: '#666'
-              }}>
-                <strong>Phone:</strong> {selectedVendor.contactNumber || 'Not available'}
-              </div>
+
 
               {/* Operating Hours and Days - Compact */}
               <div style={{ 
@@ -1344,45 +1272,47 @@ The user reports that this vendor is not present at the specified location.
             onClick={closeVendorCard}
           />
         )}
+
+        {/* Report Location Modal */}
+        {selectedVendor && (
+          <ReportLocationModal
+            isOpen={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            vendorName={selectedVendor.name || 'Unknown Vendor'}
+            vendorId={selectedVendor._id}
+            vendorLocation={(() => {
+              const extractCoordinates = (mapsLink: string | undefined | null) => {
+                if (!mapsLink || typeof mapsLink !== 'string') return null;
+                try {
+                  const patterns = [
+                    /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+                    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+                    /place\/.*\/@(-?\d+\.\d+),(-?\d+\.\d+)/,
+                    /q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+                  ];
+                  for (const pattern of patterns) {
+                    const match = mapsLink.match(pattern);
+                    if (match) {
+                      return {
+                        latitude: parseFloat(match[1]),
+                        longitude: parseFloat(match[2]),
+                      };
+                    }
+                  }
+                  return null;
+                } catch (error) {
+                  return null;
+                }
+              };
+              const coords = extractCoordinates(selectedVendor.mapsLink);
+              return coords ? `${coords.latitude}, ${coords.longitude}` : 'Location not available';
+            })()}
+            vendorArea="Area not specified"
+            userLocation="User location not available"
+          />
+        )}
       </div>
-      {/* WhatsApp Floating Button */}
-      <a
-        href="https://wa.me/15557897194?text=Hi"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Chat with us on WhatsApp"
-        style={{
-          position: 'fixed',
-          bottom: '28px',
-          right: '28px',
-          zIndex: 2500,
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          background: '#25D366',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'box-shadow 0.2s, transform 0.2s',
-          cursor: 'pointer',
-          textDecoration: 'none',
-        }}
-        onMouseEnter={e => {
-          (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.28)';
-          (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.08)';
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.18)';
-          (e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1)';
-        }}
-      >
-        {/* WhatsApp SVG Icon */}
-        <svg width="34" height="34" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="16" cy="16" r="16" fill="#25D366"/>
-          <path d="M16 6.5C10.2 6.5 5.5 11.2 5.5 17C5.5 18.7 6 20.3 6.8 21.7L5 27L10.4 25.2C11.7 25.9 13.3 26.5 15 26.5C20.8 26.5 25.5 21.8 25.5 16C25.5 11.2 20.8 6.5 16 6.5ZM15 24.5C13.5 24.5 12.1 24.1 10.9 23.4L10.6 23.2L7.5 24.2L8.5 21.1L8.3 20.8C7.5 19.5 7 18 7 16.5C7 12.4 10.4 9 14.5 9C18.6 9 22 12.4 22 16.5C22 20.6 18.6 24 14.5 24C14.3 24 14.1 24 14 24C14.3 24.2 14.6 24.4 15 24.5ZM19.2 18.7C18.9 18.6 17.7 18 17.4 17.9C17.1 17.8 16.9 17.8 16.7 18.1C16.5 18.3 16.2 18.7 16 18.9C15.8 19.1 15.6 19.1 15.3 19C14.2 18.6 13.2 17.7 12.6 16.7C12.5 16.4 12.6 16.2 12.8 16C13 15.8 13.2 15.5 13.3 15.3C13.4 15.1 13.4 14.9 13.3 14.7C13.2 14.5 12.7 13.3 12.5 12.8C12.3 12.3 12.1 12.3 11.9 12.3C11.7 12.3 11.5 12.3 11.3 12.3C11.1 12.3 10.8 12.4 10.7 12.6C10.2 13.2 10 14.1 10.2 15.1C10.5 16.7 11.7 18.2 13.2 19.1C14.7 20 16.5 20.2 18.1 19.7C19.1 19.4 20 18.8 20.6 18.3C20.8 18.2 20.9 18 20.9 17.8C20.9 17.6 20.8 17.4 20.7 17.3C20.6 17.2 20.5 17.1 20.3 17.1C20.1 17.1 19.5 17.1 19.2 18.7Z" fill="#fff"/>
-        </svg>
-      </a>
+
     </div>
   );
 };

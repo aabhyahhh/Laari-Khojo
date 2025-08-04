@@ -5,6 +5,7 @@ import Register from "./components/Register";
 import UpdateProfile from "./components/UpdateProfile";
 import Login from "./components/Login";
 import ImageUploadModal from "./components/ImageUploadModal";
+import ReportLocationModal from "./components/ReportLocationModal";
 import laari from "./assets/logo_cropped.png";
 import logo from "./assets/logo.png";
 import { useEffect, useRef, useState } from "react";
@@ -56,7 +57,8 @@ const FOOD_CATEGORIES = [
   'Gujju Snacks',
   'PavBhaji',
   'Punjabi (Parathe, Lassi, etc)',
-  'Paan',
+  'Pizza',
+  'Burger',
   'Korean',
   'Chinese',
   'South Indian',
@@ -195,9 +197,46 @@ function MapDisplay() {
   const [showImageUploadModal, setShowImageUploadModal] = useState(false);
   const [uploadType, setUploadType] = useState<'profile' | 'carousel'>('profile');
 
+  // Report location modal states
+  const [showReportModal, setShowReportModal] = useState(false);
+
+  // Carousel state
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [carouselInterval, setCarouselInterval] = useState<number | null>(null);
+
+  // Touch/swipe functionality for carousel
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
   const navigate = useNavigate();
 
+  // Auto-rotation for carousel
+  useEffect(() => {
+    if (selectedVendor?.carouselImages && selectedVendor.carouselImages.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentImageIndex(prev => 
+          prev >= selectedVendor.carouselImages!.length - 1 ? 0 : prev + 1
+        );
+      }, 3000);
 
+      setCarouselInterval(interval);
+
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    } else {
+      setCurrentImageIndex(0);
+      if (carouselInterval) {
+        clearInterval(carouselInterval);
+        setCarouselInterval(null);
+      }
+    }
+  }, [selectedVendor?.carouselImages]);
+
+  // Reset carousel index when vendor changes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [selectedVendor?._id]);
 
   // Filter vendors based on active filters and open status
   const applyFilters = (vendorList: Vendor[]) => {
@@ -246,9 +285,15 @@ function MapDisplay() {
   const handleFilterChange = (filterType: 'foodTypes' | 'categories', value: string) => {
     setActiveFilters(prev => {
       const currentFilters = prev[filterType];
-      const newFilters = currentFilters.includes(value)
-        ? currentFilters.filter(item => item !== value)
-        : [...currentFilters, value];
+      let newFilters: string[];
+      
+      // Single selection: if the clicked value is already selected, deselect it
+      // Otherwise, replace the current selection with the new one
+      if (currentFilters.includes(value)) {
+        newFilters = currentFilters.filter(item => item !== value);
+      } else {
+        newFilters = [value]; // Only allow one selection at a time
+      }
 
       const updatedFilters = {
         ...prev,
@@ -429,7 +474,11 @@ function MapDisplay() {
     }
   };
 
-  const extractCoordinates = (mapsLink: string) => {
+  const extractCoordinates = (mapsLink: string | undefined | null) => {
+    // Check if mapsLink exists and is a string
+    if (!mapsLink || typeof mapsLink !== 'string') {
+      return null;
+    }
     try {
       console.log("Attempting to extract coordinates from:", mapsLink);
 
@@ -815,6 +864,22 @@ function MapDisplay() {
         </div>
       </div>
     `;
+  };
+
+  // Helper function to get food type display info
+  const getFoodTypeDisplay = (foodType?: string) => {
+    switch (foodType) {
+      case 'veg':
+        return { color: '#28a745', text: 'Veg' };
+      case 'non-veg':
+        return { color: '#dc3545', text: 'Non-Veg' };
+      case 'swaminarayan':
+        return { color: '#6f42c1', text: 'Swaminarayan' };
+      case 'jain':
+        return { color: '#6f42c1', text: 'Jain' };
+      default:
+        return { color: '#6c757d', text: foodType || 'Food type not specified' };
+    }
   };
 
   // Updated updateMapMarkers function to group vendors by location
@@ -1388,17 +1453,45 @@ function MapDisplay() {
     setSubmitting(false);
   };
 
+  // Touch/swipe functionality for carousel
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe && selectedVendor?.carouselImages) {
+      const newIndex = (currentImageIndex + 1) % selectedVendor.carouselImages.length;
+      setCurrentImageIndex(newIndex);
+    } else if (isRightSwipe && selectedVendor?.carouselImages) {
+      const newIndex = currentImageIndex === 0 
+        ? selectedVendor.carouselImages.length - 1 
+        : currentImageIndex - 1;
+      setCurrentImageIndex(newIndex);
+    }
+
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
+
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Top bar: Logo and Search Bar in a flex container for alignment */}
+      {/* Top bar: Logo and Search Bar with Buttons */}
       <div
         style={{
           position: 'absolute',
           top: '20px',
           left: '20px',
           zIndex: 1200,
-          width: 'calc(100vw - 40px)',
-          maxWidth: '700px',
           display: 'flex',
           alignItems: 'center',
           gap: '16px',
@@ -1418,163 +1511,161 @@ function MapDisplay() {
         >
           <img src={logo} alt="Laari Logo" style={{ height: '60px', width: 'auto' }} />
         </div>
+        
         {/* Search Bar */}
         <div
           style={{
-            flex: 1,
-            minWidth: 0,
             display: 'flex',
             alignItems: 'center',
             pointerEvents: 'auto',
+            position: 'relative',
           }}
         >
-          <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
-            <input
-              type="text"
-              placeholder="Search for a vendor or area..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              onFocus={() => setShowSuggestions(searchResults.length > 0)}
-              onKeyPress={handleSearchKeyPress}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                borderRadius: '24px',
-                border: '1px solid #ccc',
-                fontSize: '16px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                outline: 'none',
-                background: 'white',
-              }}
-            />
-            {showSuggestions && searchResults.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: '48px',
-                left: 0,
-                width: '100%',
-                background: 'white',
-                border: '1px solid #eee',
-                borderRadius: '0 0 12px 12px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                maxHeight: '220px',
-                overflowY: 'auto',
-                zIndex: 1300,
-              }}>
-                {searchResults.map((result, index) => {
-                  if (result.type === 'area') {
-                    return (
-                      <div
-                        key={`area-${index}`}
-                        onClick={() => handleSearchSelect(result)}
-                        style={{
-                          padding: '12px 16px',
-                          cursor: 'pointer',
-                          borderBottom: '1px solid #f3f3f3',
-                          fontWeight: 500,
-                          color: '#2c3e50',
-                          background: '#e8f4fd',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                        onMouseDown={e => e.preventDefault()}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={{ marginRight: '8px', fontSize: '16px' }}>📍</span>
-                          <span>{result.displayName}</span>
-                        </div>
-                        <span style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Area</span>
+          <input
+            type="text"
+            placeholder="Search for a vendor or area..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            onFocus={() => setShowSuggestions(searchResults.length > 0)}
+            onKeyPress={handleSearchKeyPress}
+            style={{
+              width: '400px',
+              padding: '12px 20px',
+              borderRadius: '25px',
+              border: '1px solid #ddd',
+              fontSize: '14px',
+              outline: 'none',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              backgroundColor: 'white',
+            }}
+                    />
+          {showSuggestions && searchResults.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '48px',
+              left: 0,
+              width: '100%',
+              background: 'white',
+              border: '1px solid #eee',
+              borderRadius: '0 0 12px 12px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+              maxHeight: '220px',
+              overflowY: 'auto',
+              zIndex: 1300,
+            }}>
+              {searchResults.map((result, index) => {
+                if (result.type === 'area') {
+                  return (
+                    <div
+                      key={`area-${index}`}
+                      onClick={() => handleSearchSelect(result)}
+                      style={{
+                        padding: '12px 16px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #f3f3f3',
+                        fontWeight: 500,
+                        color: '#2c3e50',
+                        background: '#e8f4fd',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                      onMouseDown={e => e.preventDefault()}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ marginRight: '8px', fontSize: '16px' }}>📍</span>
+                        <span>{result.displayName}</span>
                       </div>
-                    );
-                  } else if (result.type === 'area-vendors') {
-                    return (
-                      <div
-                        key={`area-vendors-${index}`}
-                        onClick={() => handleSearchSelect(result)}
-                        style={{
-                          padding: '12px 16px',
-                          cursor: 'pointer',
-                          borderBottom: '1px solid #f3f3f3',
-                          fontWeight: 500,
-                          color: '#2c3e50',
-                          background: '#fff3cd',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                        onMouseDown={e => e.preventDefault()}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={{ marginRight: '8px', fontSize: '16px' }}>🏪</span>
-                          <span>{result.displayName}</span>
-                        </div>
-                        <span style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Area Vendors</span>
+                      <span style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Area</span>
+                    </div>
+                  );
+                } else if (result.type === 'area-vendors') {
+                  return (
+                    <div
+                      key={`area-vendors-${index}`}
+                      onClick={() => handleSearchSelect(result)}
+                      style={{
+                        padding: '12px 16px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #f3f3f3',
+                        fontWeight: 500,
+                        color: '#2c3e50',
+                        background: '#fff3cd',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                      onMouseDown={e => e.preventDefault()}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ marginRight: '8px', fontSize: '16px' }}>🏪</span>
+                        <span>{result.displayName}</span>
                       </div>
-                    );
-                  } else {
-                    // Individual vendor
-                    return (
-                      <div
-                        key={result._id}
-                        onClick={() => handleSearchSelect(result)}
-                        style={{
-                          padding: '12px 16px',
-                          cursor: 'pointer',
-                          borderBottom: '1px solid #f3f3f3',
-                          fontWeight: 500,
-                          color: '#2c3e50',
-                          background: searchTerm === result.name ? '#f5f8ff' : 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                        onMouseDown={e => e.preventDefault()}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={{ marginRight: '8px', fontSize: '16px' }}>🍽️</span>
-                          <span>{result.name}</span>
-                        </div>
-                        <span style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Vendor</span>
+                      <span style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Area Vendors</span>
+                    </div>
+                  );
+                } else {
+                  // Individual vendor
+                  return (
+                    <div
+                      key={result._id}
+                      onClick={() => handleSearchSelect(result)}
+                      style={{
+                        padding: '12px 16px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #f3f3f3',
+                        fontWeight: 500,
+                        color: '#2c3e50',
+                        background: searchTerm === result.name ? '#f5f8ff' : 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                      onMouseDown={e => e.preventDefault()}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ marginRight: '8px', fontSize: '16px' }}>🍽️</span>
+                        <span>{result.name}</span>
                       </div>
-                    );
-                  }
-                })}
-              </div>
-            )}
-          </div>
+                      <span style={{ fontSize: '12px', color: '#666', fontWeight: '500' }}>Vendor</span>
+                    </div>
+                  );
+                }
+              })}
+            </div>
+          )}
         </div>
-      </div>
-      
-      {/* Filter Panel */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '100px',
-          left: '20px',
-          zIndex: 1200,
-          width: '300px',
-        }}
-      >
+        
+                {/* Filter Buttons - Right next to search bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            pointerEvents: 'auto',
+            position: 'relative',
+          }}
+        >
         {/* Filter Toggle Button */}
         <button
           onClick={() => setShowFilters(!showFilters)}
           style={{
-            padding: window.innerWidth <= 768 ? '4px 10px' : '8px 16px',
+            padding: '6px 12px',
             backgroundColor: 'white',
-            border: '2px solid #C80B41',
-            borderRadius: '20px',
+            border: '1px solid #C80B41',
+            borderRadius: '18px',
             cursor: 'pointer',
-            fontSize: window.innerWidth <= 768 ? '10px' : '14px',
+            fontSize: '11px',
             fontWeight: '500',
             color: '#C80B41',
             display: 'flex',
             alignItems: 'center',
-            gap: window.innerWidth <= 768 ? '4px' : '8px',
+            gap: '4px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             transition: 'all 0.2s',
             pointerEvents: 'auto',
-            marginBottom: '8px',
+            minWidth: '80px',
+            justifyContent: 'center',
           }}
           onMouseEnter={(e) => {
             (e.target as HTMLButtonElement).style.backgroundColor = '#fff5f7';
@@ -1583,7 +1674,7 @@ function MapDisplay() {
             (e.target as HTMLButtonElement).style.backgroundColor = 'white';
           }}
         >
-          <span>🔍</span>
+          <span style={{ fontSize: '14px' }}>🔍</span>
           Filters
           {(activeFilters.foodTypes.length > 0 || activeFilters.categories.length > 0) && (
             <span className="active-filters-count">
@@ -1614,20 +1705,22 @@ function MapDisplay() {
             }
           }}
           style={{
-            padding: window.innerWidth <= 768 ? '4px 10px' : '8px 16px',
+            padding: '6px 12px',
             backgroundColor: showOnlyOpen ? '#C80B41' : 'white',
-            border: '2px solid #C80B41',
-            borderRadius: '20px',
+            border: '1px solid #C80B41',
+            borderRadius: '18px',
             cursor: 'pointer',
-            fontSize: window.innerWidth <= 768 ? '10px' : '14px',
+            fontSize: '11px',
             fontWeight: '500',
             color: showOnlyOpen ? 'white' : '#C80B41',
             display: 'flex',
             alignItems: 'center',
-            gap: window.innerWidth <= 768 ? '4px' : '8px',
+            gap: '4px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             transition: 'all 0.2s',
             pointerEvents: 'auto',
+            minWidth: '100px',
+            justifyContent: 'center',
           }}
           onMouseEnter={(e) => {
             if (!showOnlyOpen) {
@@ -1640,13 +1733,26 @@ function MapDisplay() {
             }
           }}
         >
-          <span>🕐</span>
+          <span style={{ fontSize: '14px' }}>🕐</span>
           {showOnlyOpen ? 'Show All' : "What's Open Now"}
         </button>
 
         {/* Filter Panel Content */}
-        {showFilters && (
-          <div className="filter-panel" style={{ marginTop: '12px', pointerEvents: 'auto' }}>
+                {showFilters && (
+          <div className="filter-panel" style={{
+            position: 'absolute',
+            top: '100%',
+            left: '0',
+            marginTop: '12px',
+            pointerEvents: 'auto',
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '20px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            minWidth: '300px',
+            zIndex: 1201,
+            maxWidth: '400px',
+          }}>
             {/* Vendor Count */}
             <div style={{ 
               marginBottom: '16px', 
@@ -1680,7 +1786,7 @@ function MapDisplay() {
                     className={`filter-chip ${activeFilters.foodTypes.includes(type) ? 'active' : ''}`}
                     onClick={() => handleFilterChange('foodTypes', type)}
                   >
-                    {type === 'veg' ? '🥬' : type === 'non-veg' ? '🍗' : type === 'swaminarayan' ? '🕉️' : '☸️'} {type}
+                    {type === 'veg' ? '🥬' : type === 'non-veg' ? '🍗' : type === 'swaminarayan' ? '🕉️' : '☸️'} {type.charAt(0).toUpperCase() + type.slice(1)}
                   </button>
                 ))}
               </div>
@@ -1719,6 +1825,7 @@ function MapDisplay() {
             </div>
           </div>
         )}
+        </div>
       </div>
       
       {/* Error message covers search bar and can be dismissed */}
@@ -1811,7 +1918,10 @@ function MapDisplay() {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+            <path d="M3 21v-5h5" />
           </svg>
         </button>
         {/* Zoom controls will be rendered by Leaflet, but you can add custom ones here if needed */}
@@ -1969,14 +2079,22 @@ function MapDisplay() {
               }}>
                 {selectedVendor.name || 'Not available'}
               </h2>
-              <div style={{ 
-                color: '#666', 
-                marginBottom: '12px', 
-                fontSize: '13px',
-                fontWeight: '500'
-              }}>
-                {selectedVendor.foodType || 'Not available'}
-              </div>
+              {/* Food Type Tag */}
+              {selectedVendor.foodType && (
+                <div style={{
+                  display: 'inline-block',
+                  backgroundColor: getFoodTypeDisplay(selectedVendor.foodType).color,
+                  color: 'white',
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  marginBottom: '12px',
+                  textAlign: 'center'
+                }}>
+                  {getFoodTypeDisplay(selectedVendor.foodType).text}
+                </div>
+              )}
             </div>
 
             {/* Operating Status */}
@@ -2071,42 +2189,7 @@ function MapDisplay() {
               )}
             </div>
 
-            {/* Carousel Upload Button */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'center',
-              marginBottom: '20px'
-            }}>
-              <button
-                onClick={() => {
-                  setUploadType('carousel');
-                  setShowImageUploadModal(true);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '10px 16px',
-                  backgroundColor: '#ff6b6b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '500',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  justifyContent: 'center'
-                }}
-                onMouseEnter={(e) => {
-                  (e.target as HTMLButtonElement).style.backgroundColor = '#e55a5a';
-                }}
-                onMouseLeave={(e) => {
-                  (e.target as HTMLButtonElement).style.backgroundColor = '#ff6b6b';
-                }}
-              >
-                📸 Add Laari Images
-              </button>
-            </div>
+
 
             {/* Report Button */}
             <div style={{ 
@@ -2115,54 +2198,7 @@ function MapDisplay() {
               marginBottom: '20px'
             }}>
               <button
-                onClick={() => {
-                  const vendorCoords = getVendorCoordinates(selectedVendor);
-                  const reportData = {
-                    vendorName: selectedVendor.name || 'Unknown Vendor',
-                    vendorId: selectedVendor._id,
-                    vendorLocation: vendorCoords ? `${vendorCoords.latitude}, ${vendorCoords.longitude}` : 'Location not available',
-                    vendorArea: selectedVendor.area || selectedVendor.location?.area || 'Area not specified',
-                    userLocation: userLocation ? `${userLocation.latitude}, ${userLocation.longitude}` : 'User location not available',
-                    reportTime: new Date().toISOString(),
-                    subject: `Wrong Location Report - ${selectedVendor.name || 'Unknown Vendor'}`
-                  };
-
-                  // Create form data for Web3Forms
-                  const formData = new FormData();
-                  formData.append('access_key', 'd003bcfb-91bc-44d0-8347-1259bbc5158f'); // Replace with actual access key
-                  formData.append('subject', reportData.subject);
-                  formData.append('from_name', 'LaariKhojo User');
-                  formData.append('message', `
-Vendor Location Report
-
-Vendor Name: ${reportData.vendorName}
-Vendor ID: ${reportData.vendorId}
-Vendor Location: ${reportData.vendorLocation}
-Vendor Area: ${reportData.vendorArea}
-User Location: ${reportData.userLocation}
-Report Time: ${new Date(reportData.reportTime).toLocaleString()}
-
-The user reports that this vendor is not present at the specified location.
-                  `.trim());
-
-                  // Submit to Web3Forms
-                  fetch('https://api.web3forms.com/submit', {
-                    method: 'POST',
-                    body: formData
-                  })
-                  .then(response => response.json())
-                  .then(data => {
-                    if (data.success) {
-                      alert('Thank you for reporting! We will investigate this location issue.');
-                    } else {
-                      alert('Failed to submit report. Please try again.');
-                    }
-                  })
-                  .catch(error => {
-                    console.error('Error submitting report:', error);
-                    alert('Failed to submit report. Please try again.');
-                  });
-                }}
+                onClick={() => setShowReportModal(true)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -2190,14 +2226,7 @@ The user reports that this vendor is not present at the specified location.
             </div>
 
             {/* Contact Number */}
-            <div style={{ 
-              marginBottom: '16px', 
-              fontSize: '13px',
-              textAlign: 'center',
-              color: '#666'
-            }}>
-              <strong>Phone:</strong> {selectedVendor.contactNumber || 'Not available'}
-            </div>
+
 
             {/* Operating Hours and Days - Compact */}
             <div style={{ 
@@ -2299,6 +2328,241 @@ The user reports that this vendor is not present at the specified location.
                   border: '1px solid #e9ecef'
                 }}>
                   Menu not available
+                </div>
+              )}
+            </div>
+
+            {/* Carousel Upload Button */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center',
+              marginBottom: '16px'
+            }}>
+              <button
+                onClick={() => {
+                  setUploadType('carousel');
+                  setShowImageUploadModal(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 16px',
+                  backgroundColor: '#ff6b6b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '500',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLButtonElement).style.backgroundColor = '#e55a5a';
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLButtonElement).style.backgroundColor = '#ff6b6b';
+                }}
+              >
+                📸 Add Laari Images
+              </button>
+            </div>
+
+            {/* Carousel Images Section */}
+            <div style={{ 
+              marginTop: 24, 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: 12, 
+              padding: 16, 
+              border: '1px solid #e9ecef' 
+            }}>
+              <h3 style={{ 
+                fontSize: '16px', 
+                color: '#2c3e50', 
+                margin: '0 0 16px 0',
+                fontWeight: 600 
+              }}>
+                Laari Images
+              </h3>
+              
+              {selectedVendor.carouselImages && selectedVendor.carouselImages.length > 0 ? (
+                <div style={{
+                  position: 'relative',
+                  width: '100%',
+                  height: '200px',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  backgroundColor: '#fff',
+                  border: '1px solid #e9ecef'
+                }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                >
+                  {/* Carousel Container */}
+                  <div 
+                    id="carousel-container"
+                    style={{
+                      display: 'flex',
+                      width: `${(selectedVendor.carouselImages?.length || 1) * 100}%`,
+                      height: '100%',
+                      transition: 'transform 0.5s ease-in-out',
+                      transform: `translateX(-${currentImageIndex * (100 / (selectedVendor.carouselImages?.length || 1))}%)`
+                    }}
+                  >
+                    {selectedVendor.carouselImages?.map((imageUrl, index) => (
+                      <div 
+                        key={index} 
+                        style={{
+                          width: `${100 / (selectedVendor.carouselImages?.length || 1)}%`,
+                          height: '100%',
+                          flexShrink: 0,
+                          position: 'relative'
+                        }}
+                      >
+                        <img 
+                          src={imageUrl} 
+                          alt={`Laari image ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => {
+                            window.open(imageUrl, '_blank');
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Navigation Arrows */}
+                  {selectedVendor.carouselImages && selectedVendor.carouselImages.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => {
+                          const newIndex = currentImageIndex - 1;
+                          setCurrentImageIndex(newIndex < 0 ? selectedVendor.carouselImages!.length - 1 : newIndex);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          left: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'rgba(0, 0, 0, 0.6)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          zIndex: 10,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)';
+                        }}
+                      >
+                        ‹
+                      </button>
+                      <button
+                        onClick={() => {
+                          const newIndex = currentImageIndex + 1;
+                          setCurrentImageIndex(newIndex >= selectedVendor.carouselImages!.length ? 0 : newIndex);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'rgba(0, 0, 0, 0.6)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          zIndex: 10,
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)';
+                        }}
+                      >
+                        ›
+                      </button>
+                    </>
+                  )}
+
+                  {/* Dots Indicator */}
+                  {selectedVendor.carouselImages && selectedVendor.carouselImages.length > 1 && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      display: 'flex',
+                      gap: '6px',
+                      zIndex: 10
+                    }}>
+                      {selectedVendor.carouselImages.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            border: 'none',
+                            background: index === currentImageIndex ? '#fff' : 'rgba(255, 255, 255, 0.5)',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s'
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ 
+                  color: '#888', 
+                  fontSize: '13px', 
+                  textAlign: 'center',
+                  padding: 24,
+                  backgroundColor: '#fff',
+                  borderRadius: 8,
+                  border: '1px solid #e9ecef'
+                }}>
+                  <div style={{ 
+                    fontSize: 32, 
+                    opacity: 0.3,
+                    marginBottom: 8
+                  }}>
+                    📸
+                  </div>
+                  <div>No laari images yet</div>
+                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>
+                    Images will appear here once uploaded
+                  </div>
                 </div>
               )}
             </div>
@@ -2751,36 +3015,7 @@ The user reports that this vendor is not present at the specified location.
           onClick={closeVendorCard}
         />
       )}
-      {/* WhatsApp Floating Button - Bottom Right */}
-      <a
-        href="https://wa.me/15557897194?text=Hi"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          zIndex: 2500,
-          width: 50,
-          height: 50,
-          borderRadius: '50%',
-          background: '#25D366',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          transition: 'background 0.2s',
-          padding: 0,
-        }}
-        aria-label="Chat on WhatsApp"
-      >
-        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="16" cy="16" r="16" fill="#25D366"/>
-          <path d="M16 6.5C10.2 6.5 5.5 11.2 5.5 17C5.5 18.7 6 20.3 6.8 21.7L5 27L10.4 25.2C11.7 25.9 13.3 26.5 15 26.5C20.8 26.5 25.5 21.8 25.5 16C25.5 11.2 20.8 6.5 16 6.5ZM15 24.5C13.5 24.5 12.1 24.1 10.9 23.4L10.6 23.2L7.5 24.2L8.5 21.1L8.3 20.8C7.5 19.5 7 18 7 16.5C7 12.4 10.4 9 14.5 9C18.6 9 22 12.4 22 16.5C22 20.6 18.6 24 14.5 24C14.3 24 14.1 24 14 24C14.3 24.2 14.6 24.4 15 24.5ZM19.2 18.7C18.9 18.6 17.7 18 17.4 17.9C17.1 17.8 16.9 17.8 16.7 18.1C16.5 18.3 16.2 18.7 16 18.9C15.8 19.1 15.6 19.1 15.3 19C14.2 18.6 13.2 17.7 12.6 16.7C12.5 16.4 12.6 16.2 12.8 16C13 15.8 13.2 15.5 13.3 15.3C13.4 15.1 13.4 14.9 13.3 14.7C13.2 14.5 12.7 13.3 12.5 12.8C12.3 12.3 12.1 12.3 11.9 12.3C11.7 12.3 11.5 12.3 11.3 12.3C11.1 12.3 10.8 12.4 10.7 12.6C10.2 13.2 10 14.1 10.2 15.1C10.5 16.7 11.7 18.2 13.2 19.1C14.7 20 16.5 20.2 18.1 19.7C19.1 19.4 20 18.8 20.6 18.3C20.8 18.2 20.9 18 20.9 17.8C20.9 17.6 20.8 17.4 20.7 17.3C20.6 17.2 20.5 17.1 20.3 17.1C20.1 17.1 19.5 17.1 19.2 18.7Z" fill="#fff"/>
-        </svg>
-      </a>
+
 
       {/* Image Upload Modal */}
       <ImageUploadModal
@@ -2788,6 +3023,19 @@ The user reports that this vendor is not present at the specified location.
         onClose={() => setShowImageUploadModal(false)}
         uploadType={uploadType}
       />
+
+      {/* Report Location Modal */}
+      {selectedVendor && (
+        <ReportLocationModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          vendorName={selectedVendor.name || selectedVendor.businessName || selectedVendor.vendorName || 'Unknown Vendor'}
+          vendorId={selectedVendor._id}
+          vendorLocation={getVendorCoordinates(selectedVendor) ? `${getVendorCoordinates(selectedVendor)!.latitude}, ${getVendorCoordinates(selectedVendor)!.longitude}` : 'Location not available'}
+          vendorArea={selectedVendor.area || selectedVendor.location?.area || 'Area not specified'}
+          userLocation={userLocation ? `${userLocation.latitude}, ${userLocation.longitude}` : 'User location not available'}
+        />
+      )}
     </div>
   );
 }

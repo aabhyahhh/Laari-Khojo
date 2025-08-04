@@ -44,17 +44,17 @@ app.use(cors({
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect(MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() =>{
-  console.log("App connected to database");
-  app.listen(PORT, ()=>{
-    console.log(`App listening to: ${PORT}`);
+mongoose.connect(MONGO_URI)
+  .then(() => {
+    console.log("App connected to database");
+    app.listen(PORT, () => {
+      console.log(`App listening to: ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error("MongoDB connection error:", error);
+    process.exit(1);
   });
-}).catch((error)=>{
-  console.log(error)
-});
 
 // Add error handler
 mongoose.connection.on("error", (err) => {

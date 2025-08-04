@@ -63,8 +63,14 @@ const uploadProfilePicture = async (req, res) => {
       });
     }
 
+    // Normalize phone number - ensure it has +91 prefix
+    let normalizedPhoneNumber = phoneNumber;
+    if (!phoneNumber.startsWith('+91')) {
+      normalizedPhoneNumber = `+91${phoneNumber}`;
+    }
+
     // Find vendor by phone number
-    const vendor = await User.findOne({ contactNumber: phoneNumber });
+    const vendor = await User.findOne({ contactNumber: normalizedPhoneNumber });
     
     if (!vendor) {
       return res.status(404).json({
@@ -76,9 +82,19 @@ const uploadProfilePicture = async (req, res) => {
     // Upload to Cloudinary
     const uploadResult = await uploadToCloudinary(file.buffer, 'profile');
 
-    // Update vendor profile picture
-    vendor.profilePicture = uploadResult.secure_url;
-    await vendor.save();
+    // Update vendor profile picture using findOneAndUpdate to avoid validation issues
+    const updatedVendor = await User.findOneAndUpdate(
+      { contactNumber: normalizedPhoneNumber },
+      { profilePicture: uploadResult.secure_url },
+      { new: true, runValidators: false }
+    );
+
+    if (!updatedVendor) {
+      return res.status(404).json({
+        success: false,
+        msg: "Failed to update profile picture"
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -118,16 +134,14 @@ const uploadCarouselImages = async (req, res) => {
       });
     }
 
-    // Limit to 10 images
-    if (files.length > 10) {
-      return res.status(400).json({
-        success: false,
-        msg: "Maximum 10 images allowed"
-      });
+    // Normalize phone number - ensure it has +91 prefix
+    let normalizedPhoneNumber = phoneNumber;
+    if (!phoneNumber.startsWith('+91')) {
+      normalizedPhoneNumber = `+91${phoneNumber}`;
     }
 
     // Find vendor by phone number
-    const vendor = await User.findOne({ contactNumber: phoneNumber });
+    const vendor = await User.findOne({ contactNumber: normalizedPhoneNumber });
     
     if (!vendor) {
       return res.status(404).json({
@@ -149,20 +163,27 @@ const uploadCarouselImages = async (req, res) => {
       vendor.carouselImages = [];
     }
     
-    vendor.carouselImages.push(...imageUrls);
-    
-    // Keep only the latest 20 images
-    if (vendor.carouselImages.length > 20) {
-      vendor.carouselImages = vendor.carouselImages.slice(-20);
-    }
+    const updatedCarouselImages = [...(vendor.carouselImages || []), ...imageUrls];
 
-    await vendor.save();
+    // Update carousel images using findOneAndUpdate to avoid validation issues
+    const updatedVendor = await User.findOneAndUpdate(
+      { contactNumber: normalizedPhoneNumber },
+      { carouselImages: updatedCarouselImages },
+      { new: true, runValidators: false }
+    );
+
+    if (!updatedVendor) {
+      return res.status(404).json({
+        success: false,
+        msg: "Failed to update carousel images"
+      });
+    }
 
     return res.status(200).json({
       success: true,
       msg: "Carousel images uploaded successfully",
       data: {
-        carouselImages: vendor.carouselImages,
+        carouselImages: updatedCarouselImages,
         newImages: imageUrls
       }
     });
@@ -222,14 +243,28 @@ const deleteCarouselImage = async (req, res) => {
   try {
     const { phoneNumber, imageUrl } = req.body;
 
-    if (!phoneNumber || !imageUrl) {
+    if (!phoneNumber) {
       return res.status(400).json({
         success: false,
-        msg: "Phone number and image URL are required"
+        msg: "Phone number is required"
       });
     }
 
-    const vendor = await User.findOne({ contactNumber: phoneNumber });
+    if (!imageUrl) {
+      return res.status(400).json({
+        success: false,
+        msg: "Image URL is required"
+      });
+    }
+
+    // Normalize phone number - ensure it has +91 prefix
+    let normalizedPhoneNumber = phoneNumber;
+    if (!phoneNumber.startsWith('+91')) {
+      normalizedPhoneNumber = `+91${phoneNumber}`;
+    }
+
+    // Find vendor by phone number
+    const vendor = await User.findOne({ contactNumber: normalizedPhoneNumber });
     
     if (!vendor) {
       return res.status(404).json({
@@ -238,19 +273,46 @@ const deleteCarouselImage = async (req, res) => {
       });
     }
 
-    // Remove image from carousel
-    if (vendor.carouselImages) {
-      vendor.carouselImages = vendor.carouselImages.filter(
-        img => img !== imageUrl
-      );
-      await vendor.save();
+    // Check if vendor has carousel images
+    if (!vendor.carouselImages || vendor.carouselImages.length === 0) {
+      return res.status(404).json({
+        success: false,
+        msg: "No carousel images found"
+      });
+    }
+
+    // Find the image index
+    const imageIndex = vendor.carouselImages.indexOf(imageUrl);
+    
+    if (imageIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        msg: "Image not found in carousel"
+      });
+    }
+
+    // Remove the image from the array
+    const updatedCarouselImages = vendor.carouselImages.filter(img => img !== imageUrl);
+
+    // Update vendor carousel images using findOneAndUpdate to avoid validation issues
+    const updatedVendor = await User.findOneAndUpdate(
+      { contactNumber: normalizedPhoneNumber },
+      { carouselImages: updatedCarouselImages },
+      { new: true, runValidators: false }
+    );
+
+    if (!updatedVendor) {
+      return res.status(404).json({
+        success: false,
+        msg: "Failed to delete carousel image"
+      });
     }
 
     return res.status(200).json({
       success: true,
-      msg: "Image deleted successfully",
+      msg: "Carousel image deleted successfully",
       data: {
-        carouselImages: vendor.carouselImages
+        carouselImages: updatedCarouselImages
       }
     });
 
@@ -258,7 +320,75 @@ const deleteCarouselImage = async (req, res) => {
     console.error('Delete carousel image error:', error);
     return res.status(500).json({
       success: false,
-      msg: "Error deleting image",
+      msg: "Error deleting carousel image",
+      error: error.message
+    });
+  }
+};
+
+// Delete profile picture
+const deleteProfilePicture = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        msg: "Phone number is required"
+      });
+    }
+
+    // Normalize phone number - ensure it has +91 prefix
+    let normalizedPhoneNumber = phoneNumber;
+    if (!phoneNumber.startsWith('+91')) {
+      normalizedPhoneNumber = `+91${phoneNumber}`;
+    }
+
+    // Find vendor by phone number
+    const vendor = await User.findOne({ contactNumber: normalizedPhoneNumber });
+    
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        msg: "Vendor not found"
+      });
+    }
+
+    // Check if vendor has a profile picture
+    if (!vendor.profilePicture) {
+      return res.status(404).json({
+        success: false,
+        msg: "No profile picture found"
+      });
+    }
+
+    // Update vendor profile picture to null using findOneAndUpdate to avoid validation issues
+    const updatedVendor = await User.findOneAndUpdate(
+      { contactNumber: normalizedPhoneNumber },
+      { profilePicture: null },
+      { new: true, runValidators: false }
+    );
+
+    if (!updatedVendor) {
+      return res.status(404).json({
+        success: false,
+        msg: "Failed to remove profile picture"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      msg: "Profile picture removed successfully",
+      data: {
+        profilePicture: null
+      }
+    });
+
+  } catch (error) {
+    console.error('Delete profile picture error:', error);
+    return res.status(500).json({
+      success: false,
+      msg: "Error removing profile picture",
       error: error.message
     });
   }
@@ -269,5 +399,6 @@ module.exports = {
   uploadProfilePicture,
   uploadCarouselImages,
   getVendorImages,
-  deleteCarouselImage
+  deleteCarouselImage,
+  deleteProfilePicture
 }; 

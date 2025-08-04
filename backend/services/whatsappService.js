@@ -1,30 +1,58 @@
-const axios = require('axios');
+const twilio = require('twilio');
 
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const WHATSAPP_API_VERSION = 'v17.0'; // Use the latest version
+// Initialize Twilio client
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 const sendWhatsAppMessage = async (to, message) => {
   try {
-    const response = await axios({
-      method: 'POST',
-      url: `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
-      headers: {
-        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      data: {
-        messaging_product: 'whatsapp',
-        to: to,
-        type: 'text',
-        text: { body: message }
-      }
+    const response = await twilioClient.messages.create({
+      body: message,
+      from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+      to: `whatsapp:${to}`
     });
 
-    console.log('Message sent successfully:', response.data);
-    return response.data;
+    console.log('Message sent successfully:', response.sid);
+    return response;
   } catch (error) {
-    console.error('Error sending WhatsApp message:', error.response?.data || error.message);
+    console.error('Error sending WhatsApp message:', error.message);
+    throw error;
+  }
+};
+
+// Send WhatsApp template message with variables
+const sendWhatsAppTemplateMessage = async (to, templateId, variables) => {
+  try {
+    const response = await twilioClient.messages.create({
+      from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+      to: `whatsapp:${to}`,
+      contentSid: templateId,
+      contentVariables: JSON.stringify(variables)
+    });
+
+    console.log('Template message sent successfully:', response.sid);
+    return response;
+  } catch (error) {
+    console.error('Error sending WhatsApp template message:', error.message);
+    throw error;
+  }
+};
+
+// Send review notification to vendor
+const sendReviewNotification = async (vendorPhoneNumber, reviewData) => {
+  try {
+    const templateId = 'HX17af3999106bed9bceb08252052e989b';
+    const variables = {
+      '1': reviewData.rating.toString(), // Rating
+      '2': reviewData.comment || 'No comment provided', // Review comment
+      '3': reviewData.reviewerName // Reviewer name
+    };
+
+    return await sendWhatsAppTemplateMessage(vendorPhoneNumber, templateId, variables);
+  } catch (error) {
+    console.error('Error sending review notification:', error.message);
     throw error;
   }
 };
@@ -42,5 +70,7 @@ You can update your location anytime by sending a new location.`;
 
 module.exports = {
   sendWhatsAppMessage,
+  sendWhatsAppTemplateMessage,
+  sendReviewNotification,
   sendLocationConfirmation
 }; 
