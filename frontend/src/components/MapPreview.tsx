@@ -269,7 +269,22 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
       console.log(`Processing vendor ${index + 1}:`, vendor);
       let coords: { latitude: number; longitude: number } | null = null;
       if (typeof vendor.latitude === 'number' && typeof vendor.longitude === 'number') {
-        coords = { latitude: vendor.latitude, longitude: vendor.longitude };
+        // Validate coordinates are in Ahmedabad/Gandhinagar area
+        const isValidAhmedabadCoordinate = (latitude: number, longitude: number): boolean => {
+          const MIN_LAT = 22.5;  // South boundary
+          const MAX_LAT = 23.5;  // North boundary
+          const MIN_LNG = 72.0;  // West boundary
+          const MAX_LNG = 73.0;  // East boundary
+          
+          return latitude >= MIN_LAT && latitude <= MAX_LAT && 
+                 longitude >= MIN_LNG && longitude <= MAX_LNG;
+        };
+        
+        if (isValidAhmedabadCoordinate(vendor.latitude, vendor.longitude)) {
+          coords = { latitude: vendor.latitude, longitude: vendor.longitude };
+        } else {
+          console.warn(`Vendor ${vendor.name} has invalid coordinates: ${vendor.latitude}, ${vendor.longitude}`);
+        }
       } else if (vendor.mapsLink) {
         // Extract coordinates from mapsLink
         const extractCoordinates = (mapsLink: string | undefined | null) => {
@@ -277,6 +292,23 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
           if (!mapsLink || typeof mapsLink !== 'string') {
             return null;
           }
+          
+          // Helper function to validate coordinates are in Ahmedabad/Gandhinagar area
+          const isValidAhmedabadCoordinate = (latitude: number, longitude: number): boolean => {
+            const MIN_LAT = 22.5;  // South boundary
+            const MAX_LAT = 23.5;  // North boundary
+            const MIN_LNG = 72.0;  // West boundary
+            const MAX_LNG = 73.0;  // East boundary
+            
+            const isValid = latitude >= MIN_LAT && latitude <= MAX_LAT && 
+                           longitude >= MIN_LNG && longitude <= MAX_LNG;
+            
+            if (!isValid) {
+              console.warn(`Invalid coordinates for Ahmedabad/Gandhinagar: ${latitude}, ${longitude}`);
+            }
+            
+            return isValid;
+          };
           
           try {
             const patterns = [
@@ -289,10 +321,15 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
             for (const pattern of patterns) {
               const match = mapsLink.match(pattern);
               if (match) {
-                return {
-                  latitude: parseFloat(match[1]),
-                  longitude: parseFloat(match[2]),
-                };
+                const latitude = parseFloat(match[1]);
+                const longitude = parseFloat(match[2]);
+                
+                if (isValidAhmedabadCoordinate(latitude, longitude)) {
+                  return { latitude, longitude };
+                } else {
+                  console.warn("Coordinates outside Ahmedabad/Gandhinagar area:", { latitude, longitude });
+                  return null;
+                }
               }
             }
             return null;
