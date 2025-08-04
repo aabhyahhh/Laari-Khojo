@@ -11,6 +11,8 @@ const User = require('./models/userModel');
 const authRoutes = require("./routes/authRoute");
 const webhookRoutes = require("./routes/webhookRoute");
 const reviewRoutes = require("./routes/reviewRoute");
+const otpRoutes = require("./routes/otpRoute");
+const imageUploadRoutes = require("./routes/imageUploadRoute");
 
 const allowedOrigins = [
   "https://laarikhojo.in",  // Without trailing slash
@@ -42,17 +44,17 @@ app.use(cors({
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect(MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() =>{
-  console.log("App connected to database");
-  app.listen(PORT, ()=>{
-    console.log(`App listening to: ${PORT}`);
+mongoose.connect(MONGO_URI)
+  .then(() => {
+    console.log("App connected to database");
+    app.listen(PORT, () => {
+      console.log(`App listening to: ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error("MongoDB connection error:", error);
+    process.exit(1);
   });
-}).catch((error)=>{
-  console.log(error)
-});
 
 // Add error handler
 mongoose.connection.on("error", (err) => {
@@ -65,6 +67,8 @@ app.use(express.static(path.join(__dirname, '../frontend/dist')));
 app.use("/api", authRoutes);
 app.use("/api", webhookRoutes);
 app.use("/api", reviewRoutes);
+app.use("/api", otpRoutes);
+app.use("/api", imageUploadRoutes);
 
 app.get("/api/expand-url", async (req, res) => {
   const { url } = req.query;

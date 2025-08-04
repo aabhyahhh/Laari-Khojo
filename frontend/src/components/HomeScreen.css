@@ -75,6 +75,7 @@
   gap: 10px; /* Space between text and arrow */
   transition: background-color 0.3s ease;
   border: none; /* Ensure no default button border */
+  cursor: pointer; /* Add pointer cursor on hover */
 }
 
 .get-started-btn:hover {

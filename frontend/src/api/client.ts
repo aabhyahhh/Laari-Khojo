@@ -13,6 +13,7 @@ export interface Vendor {
   updatedAt?: string;
   foodType?: 'veg' | 'non-veg' | 'swaminarayan' | 'jain' | 'none';
   profilePicture?: string;
+  carouselImages?: string[];
   bestDishes?: Array<{ name: string; price?: number; menuLink?: string }>;
   category?: string[]; // Add category field for food categories
 }
@@ -132,13 +133,16 @@ function deriveVendorCategories(vendor: any): string[] {
     if (dishNames.includes('chaat') || dishNames.includes('pani puri') || dishNames.includes('bhel puri') || dishNames.includes('dahi puri')) {
       categories.push('Chaat');
     }
-    if (dishNames.includes('juice') || dishNames.includes('lassi') || dishNames.includes('milkshake') || dishNames.includes('smoothie')) {
+    if (dishNames.includes('juice') || dishNames.includes('smoothie')) {
       categories.push('Juices');
+    }
+    if (dishNames.includes('lassi') || dishNames.includes('milkshake')) {
+      categories.push('Punjabi (Parathe, Lassi, etc)');
     }
     if (dishNames.includes('tea') || dishNames.includes('coffee') || dishNames.includes('chai')) {
       categories.push('Tea/coffee');
     }
-    if (dishNames.includes('samosa') || dishNames.includes('vada pav') || dishNames.includes('pakora') || dishNames.includes('kebab')) {
+    if (dishNames.includes('samosa') || dishNames.includes('vada pav') || dishNames.includes('pakora') || dishNames.includes('kebab') || dishNames.includes('omelette')) {
       categories.push('Snacks (Samosa, Vada Pav, etc.)');
     }
     if (dishNames.includes('dessert') || dishNames.includes('gulab jamun') || dishNames.includes('rasgulla') || dishNames.includes('ice cream')) {
@@ -153,6 +157,12 @@ function deriveVendorCategories(vendor: any): string[] {
     if (dishNames.includes('paratha') || dishNames.includes('parathe') || dishNames.includes('lassi') || dishNames.includes('butter chicken')) {
       categories.push('Punjabi (Parathe, Lassi, etc)');
     }
+    if (dishNames.includes('pizza')) {
+      categories.push('Pizza');
+    }
+    if (dishNames.includes('burger')) {
+      categories.push('Burger');
+    }
     if (dishNames.includes('paan') || dishNames.includes('betel')) {
       categories.push('Paan');
     }
@@ -162,7 +172,7 @@ function deriveVendorCategories(vendor: any): string[] {
     if (dishNames.includes('chinese') || dishNames.includes('noodles') || dishNames.includes('fried rice') || dishNames.includes('manchurian')) {
       categories.push('Chinese');
     }
-    if (dishNames.includes('dosa') || dishNames.includes('idli') || dishNames.includes('sambar') || dishNames.includes('vada')) {
+    if (dishNames.includes('dosa') || dishNames.includes('idli') || dishNames.includes('sambar') || (dishNames.includes('vada') && !dishNames.includes('vada pav'))) {
       categories.push('South Indian');
     }
   }
@@ -184,7 +194,7 @@ export function normalizeVendor(vendor: any): Vendor & { latitude?: number; long
   
   // Debug: Log categories for vendors with bestDishes
   if (Array.isArray(vendor.bestDishes) && vendor.bestDishes.length > 0) {
-    console.log(`Vendor ${vendor.name}: Categories derived:`, normalizedVendor.category);
+    console.log(`Vendor ${vendor.name}: Categories derived:`, normalizedVendor.category, 'from dishes:', vendor.bestDishes.map((d: any) => d.name));
   }
   
   // If latitude/longitude already present, return as is
