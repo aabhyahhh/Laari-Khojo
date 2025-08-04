@@ -1,60 +1,50 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const Review = require('./models/reviewModel');
 const User = require('./models/userModel');
+const Review = require('./models/reviewModel');
 const { sendReviewNotification } = require('./services/whatsappService');
 
 // Connect to MongoDB
-const MONGO_URI = process.env.MONGO_URI;
-if (!MONGO_URI) {
-  console.error('❌ MONGO_URI not found in environment variables');
-  process.exit(1);
-}
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 async function testReviewFlow() {
-  console.log('Testing Complete Review Submission Flow...\n');
+  console.log('Testing complete review submission flow...\n');
 
   try {
-    // Connect to MongoDB
-    await mongoose.connect(MONGO_URI);
-    console.log('✅ Connected to MongoDB');
-
-    // Test 1: Find a vendor in the database
-    console.log('\n1. Finding a vendor in the database...');
-    const vendor = await User.findOne({}).select('_id name contactNumber');
+    // Find the test vendor specifically
+    const vendor = await User.findOne({ name: 'test' }).select('_id name contactNumber');
     
     if (!vendor) {
-      console.log('❌ No vendors found in database');
-      console.log('💡 Tip: Add some vendors to the database first');
+      console.log('❌ Test vendor not found in database');
       return;
     }
 
-    console.log('✅ Found vendor:', {
-      id: vendor._id,
-      name: vendor.name,
-      phone: vendor.contactNumber
-    });
+    console.log('✅ Found test vendor:');
+    console.log(`   Name: ${vendor.name}`);
+    console.log(`   ID: ${vendor._id}`);
+    console.log(`   Phone: ${vendor.contactNumber}`);
 
-    // Test 2: Simulate review submission
-    console.log('\n2. Simulating review submission...');
+    // Test review data
     const reviewData = {
       vendorId: vendor._id,
       name: 'Test Reviewer',
       email: 'test@example.com',
       rating: 5,
-      comment: 'This is a test review for WhatsApp notification testing. The food was amazing!'
+      comment: 'This is a test review to verify WhatsApp notifications are working correctly!'
     };
 
-    console.log('Review data:', reviewData);
+    console.log('\n📝 Submitting review with data:', reviewData);
 
-    // Test 3: Create review (simulate the controller logic)
-    console.log('\n3. Creating review in database...');
+    // Create and save review
     const review = new Review(reviewData);
     await review.save();
-    console.log('✅ Review saved to database');
+    console.log('✅ Review saved successfully with ID:', review._id);
 
-    // Test 4: Send WhatsApp notification
-    console.log('\n4. Sending WhatsApp notification...');
+    // Test WhatsApp notification
+    console.log('\n📤 Testing WhatsApp notification...');
+    
     if (vendor.contactNumber) {
       const notificationData = {
         rating: reviewData.rating,
@@ -62,43 +52,30 @@ async function testReviewFlow() {
         reviewerName: reviewData.name
       };
 
-      try {
-        if (process.env.NODE_ENV === 'production') {
-          await sendReviewNotification(vendor.contactNumber, notificationData);
-          console.log('✅ WhatsApp notification sent successfully');
-        } else {
-          console.log('✅ Development mode - WhatsApp notification logged to console');
-          console.log('Notification would be sent to:', vendor.contactNumber);
-          console.log('Template ID: HX17af3999106bed9bceb08252052e989b');
-          console.log('Variables:', notificationData);
-        }
-      } catch (whatsappError) {
-        console.error('❌ WhatsApp notification failed:', whatsappError.message);
-        console.log('💡 This is expected if Twilio is not configured or template is not approved');
+      if (process.env.NODE_ENV === 'production') {
+        await sendReviewNotification(vendor.contactNumber, notificationData);
+        console.log('✅ WhatsApp notification sent successfully');
+      } else {
+        console.log('✅ Development mode - WhatsApp notification logged to console');
+        console.log(`📧 Would send to: ${vendor.contactNumber}`);
+        console.log(`📝 Template ID: HX17af3999106bed9bceb08252052e989b`);
+        console.log(`📊 Variables:`, notificationData);
       }
     } else {
-      console.log('⚠️ Vendor has no contact number, skipping WhatsApp notification');
+      console.log('⚠️ Vendor has no contact number');
     }
 
-    // Test 5: Clean up (optional)
-    console.log('\n5. Cleaning up test data...');
+    // Clean up - delete the test review
     await Review.findByIdAndDelete(review._id);
-    console.log('✅ Test review removed from database');
+    console.log('🧹 Test review cleaned up');
 
-    console.log('\n🎉 Review flow test completed successfully!');
-    console.log('\n📋 Summary:');
-    console.log('- ✅ Database connection working');
-    console.log('- ✅ Vendor found in database');
-    console.log('- ✅ Review creation working');
-    console.log('- ✅ WhatsApp notification logic implemented');
-    console.log('- ✅ Error handling working');
+    console.log('\n✅ Review flow test completed successfully!');
 
   } catch (error) {
-    console.error('❌ Test failed:', error.message);
+    console.error('❌ Error in review flow test:', error.message);
+    console.error('Error details:', error);
   } finally {
-    // Close MongoDB connection
-    await mongoose.connection.close();
-    console.log('\n✅ MongoDB connection closed');
+    mongoose.connection.close();
   }
 }
 

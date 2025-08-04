@@ -1,6 +1,6 @@
 const Review = require('../models/reviewModel');
 const User = require('../models/userModel');
-const { sendReviewNotification } = require('../services/whatsappService');
+const { sendReviewNotification, formatPhoneNumber } = require('../services/whatsappService');
 
 // Add a new review
 const addReview = async (req, res) => {
@@ -10,32 +10,59 @@ const addReview = async (req, res) => {
       return res.status(400).json({ success: false, msg: 'Missing required fields.' });
     }
     
+    console.log('📝 Adding review for vendor:', vendorId);
+    console.log('📊 Review data:', { name, email, rating, comment });
+    
     const review = new Review({ vendorId, name, email, rating, comment });
     await review.save();
     
+    console.log('✅ Review saved successfully with ID:', review._id);
+    
     // Send WhatsApp notification to vendor
     try {
+      console.log('🔍 Looking up vendor with ID:', vendorId);
+      
       // Get vendor details to get their phone number
       const vendor = await User.findById(vendorId);
-      if (vendor && vendor.contactNumber) {
-        const reviewData = {
-          rating: rating,
-          comment: comment,
-          reviewerName: name
-        };
+      
+      if (vendor) {
+        console.log('✅ Vendor found:', vendor.name);
+        console.log('📱 Vendor phone number:', vendor.contactNumber);
         
-        await sendReviewNotification(vendor.contactNumber, reviewData);
-        console.log(`WhatsApp notification sent to vendor ${vendor.name} (${vendor.contactNumber})`);
+        if (vendor.contactNumber) {
+          // Validate phone number format
+          const formattedNumber = formatPhoneNumber(vendor.contactNumber);
+          
+          if (formattedNumber) {
+            const reviewData = {
+              rating: rating,
+              comment: comment,
+              reviewerName: name
+            };
+            
+            console.log('📤 Sending WhatsApp notification with data:', reviewData);
+            console.log('📱 Using formatted number:', formattedNumber);
+            
+            await sendReviewNotification(vendor.contactNumber, reviewData);
+            console.log(`✅ WhatsApp notification sent to vendor ${vendor.name} (${formattedNumber})`);
+          } else {
+            console.log(`⚠️ Vendor ${vendor.name} has invalid phone number: ${vendor.contactNumber}`);
+          }
+        } else {
+          console.log(`⚠️ Vendor ${vendor.name} has no contact number`);
+        }
       } else {
-        console.log(`Vendor not found or no contact number for vendor ID: ${vendorId}`);
+        console.log(`❌ Vendor not found for ID: ${vendorId}`);
       }
     } catch (whatsappError) {
-      console.error('Error sending WhatsApp notification:', whatsappError);
+      console.error('❌ Error sending WhatsApp notification:', whatsappError.message);
+      console.error('❌ Error details:', whatsappError);
       // Don't fail the review submission if WhatsApp notification fails
     }
     
     return res.status(201).json({ success: true, msg: 'Review added successfully!', data: review });
   } catch (error) {
+    console.error('❌ Error adding review:', error.message);
     return res.status(500).json({ success: false, msg: 'Error adding review', error: error.message });
   }
 };
