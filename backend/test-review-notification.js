@@ -2,7 +2,7 @@ require('dotenv').config();
 const { sendReviewNotification } = require('./services/whatsappService');
 
 // Test phone number (replace with your WhatsApp number)
-const testPhoneNumber = process.env.TEST_PHONE_NUMBER || '+1234567890';
+const testPhoneNumber = process.env.TEST_PHONE_NUMBER || '8130026321'; // Removed +91 to test formatting
 
 async function testReviewNotification() {
   console.log('Testing WhatsApp Review Notification functionality...\n');
