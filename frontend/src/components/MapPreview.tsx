@@ -861,14 +861,15 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
                 )}
               </div>
 
-              {/* Reviews & Ratings - Enhanced Version */}
-              <div style={{ 
-                marginTop: 24, 
-                backgroundColor: '#f8f9fa', 
-                borderRadius: 12, 
-                padding: 16, 
-                border: '1px solid #e9ecef' 
-              }}>
+                          {/* Reviews & Ratings - Enhanced Version */}
+            <div style={{ 
+              marginTop: 24, 
+              marginBottom: 24, 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: 12, 
+              padding: 16, 
+              border: '1px solid #e9ecef' 
+            }}>
                 <div style={{ 
                   display: 'flex', 
                   justifyContent: 'space-between', 

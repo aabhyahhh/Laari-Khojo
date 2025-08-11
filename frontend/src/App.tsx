@@ -51,12 +51,12 @@ interface Vendor {
 const FOOD_CATEGORIES = [
   'Chaat',
   'Juices',
-  'Tea/coffee',
-  'Snacks (Samosa, Vada Pav, etc.)',
-  'Dessert',
+  'Tea/Coffee',
+  'Snacks',
+  'Desserts & Beverages',
   'Gujju Snacks',
-  'PavBhaji',
-  'Punjabi (Parathe, Lassi, etc)',
+  'Pav Bhaji',
+  'Punjabi',
   'Pizza',
   'Burger',
   'Korean',
@@ -1544,6 +1544,7 @@ function MapDisplay() {
           position: 'absolute',
           top: '20px',
           left: '20px',
+          right: '20px',
           zIndex: 1200,
           display: 'flex',
           alignItems: 'center',
@@ -1559,6 +1560,7 @@ function MapDisplay() {
             display: 'flex',
             alignItems: 'center',
             height: '60px',
+            flexShrink: 0,
           }}
           onClick={() => navigate('/')}
         >
@@ -1567,6 +1569,7 @@ function MapDisplay() {
         
         {/* Search Bar */}
         <div
+          className="mobile-search-container"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1582,7 +1585,8 @@ function MapDisplay() {
             onFocus={() => setShowSuggestions(searchResults.length > 0)}
             onKeyPress={handleSearchKeyPress}
             style={{
-              width: '400px',
+              width: '100%',
+              maxWidth: '600px',
               padding: '12px 20px',
               borderRadius: '25px',
               border: '1px solid #ddd',
@@ -1691,6 +1695,7 @@ function MapDisplay() {
         
                 {/* Filter Buttons - Right next to search bar */}
         <div
+          className="desktop-filter-buttons"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1931,6 +1936,198 @@ function MapDisplay() {
       )}
       {/* Map Content */}
       <div id="map" style={{ width: "100%", height: "100%", flexGrow: 1 }}></div>
+      
+      {/* Mobile/Tablet Filter Buttons */}
+      <div className="mobile-filter-buttons">
+        {/* Filter Button */}
+        <button
+          className={`mobile-filter-button ${showFilters ? 'selected' : ''}`}
+          onClick={() => setShowFilters(!showFilters)}
+          title="Filters"
+          style={{ position: 'relative' }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46" />
+          </svg>
+          {(activeFilters.foodTypes.length > 0 || activeFilters.categories.length > 0) && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-4px',
+                backgroundColor: '#ff4444',
+                color: 'white',
+                borderRadius: '50%',
+                width: '20px',
+                height: '20px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '2px solid white',
+              }}
+            >
+              {activeFilters.foodTypes.length + activeFilters.categories.length}
+            </div>
+          )}
+        </button>
+        
+        {/* What's Open Now Button */}
+        <button
+          className={`mobile-filter-button ${showOnlyOpen ? 'selected' : ''}`}
+          onClick={() => {
+            const newShowOnlyOpen = !showOnlyOpen;
+            setShowOnlyOpen(newShowOnlyOpen);
+            
+            if (newShowOnlyOpen) {
+              // Apply open filter immediately
+              const filtered = applyFilters(vendors);
+              setFilteredVendors(filtered);
+            } else {
+              // Clear open filter - show all vendors or apply other active filters
+              if (activeFilters.foodTypes.length === 0 && activeFilters.categories.length === 0) {
+                setFilteredVendors([]); // This will show all vendors in the useEffect
+              } else {
+                // Reapply other active filters
+                const filtered = applyFilters(vendors);
+                setFilteredVendors(filtered);
+              }
+            }
+          }}
+          title="What's Open Now"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12,6 12,12 16,14" />
+          </svg>
+        </button>
+      </div>
+      
+      {/* Mobile Filter Panel - Appears at bottom of page */}
+      {showFilters && (
+        <>
+          {/* Mobile backdrop overlay */}
+          <div 
+            className="mobile-filter-backdrop"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1299,
+            }}
+            onClick={() => setShowFilters(false)}
+          />
+          <div className="filter-panel" style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'white',
+            borderRadius: '20px 20px 0 0',
+            padding: '24px 20px 32px 20px',
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
+            zIndex: 1300,
+            maxHeight: '70vh',
+            overflowY: 'auto',
+          }}>
+            {/* Vendor Count */}
+            <div style={{ 
+              marginBottom: '16px', 
+              padding: '8px 12px', 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: '#666',
+              textAlign: 'center'
+            }}>
+              Showing {filteredVendors.length > 0 ? filteredVendors.length : vendors.length} of {vendors.length} vendors
+              {showOnlyOpen && (
+                <div style={{ 
+                  fontSize: '11px', 
+                  color: '#C80B41', 
+                  fontWeight: '500',
+                  marginTop: '2px'
+                }}>
+                  (Open now only)
+                </div>
+              )}
+            </div>
+
+            {/* Food Type Filters */}
+            <div className="filter-section">
+              <h3>Food Type</h3>
+              <div className="filter-options">
+                {FOOD_TYPES.map(type => (
+                  <button
+                    key={type}
+                    className={`filter-chip ${activeFilters.foodTypes.includes(type) ? 'active' : ''}`}
+                    onClick={() => handleFilterChange('foodTypes', type)}
+                  >
+                    {type === 'veg' ? '🥬' : type === 'non-veg' ? '🍗' : type === 'swaminarayan' ? '🕉️' : '☸️'} {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Category Filters */}
+            <div className="filter-section">
+              <h3>Food Categories</h3>
+              <div className="filter-options">
+                {FOOD_CATEGORIES.map(category => (
+                  <button
+                    key={category}
+                    className={`filter-chip ${activeFilters.categories.includes(category) ? 'active' : ''}`}
+                    onClick={() => handleFilterChange('categories', category)}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filter Actions */}
+            <div className="filter-actions">
+              <button
+                className="filter-button"
+                onClick={clearAllFilters}
+              >
+                Clear All
+              </button>
+              <button
+                className="filter-button primary"
+                onClick={() => setShowFilters(false)}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+      
       {/* Top right controls */}
       <div style={{
         position: 'absolute',
@@ -2389,7 +2586,8 @@ function MapDisplay() {
             <div style={{ 
               display: 'flex', 
               justifyContent: 'center',
-              marginBottom: '16px'
+              marginTop: '24px',
+              marginBottom: '8px'
             }}>
               <button
                 onClick={() => {
@@ -2424,7 +2622,7 @@ function MapDisplay() {
 
             {/* Carousel Images Section */}
             <div style={{ 
-              marginTop: 24, 
+              marginTop: 8, 
               backgroundColor: '#f8f9fa', 
               borderRadius: 12, 
               padding: 16, 
@@ -2623,6 +2821,7 @@ function MapDisplay() {
             {/* Reviews & Ratings - Enhanced Version */}
             <div style={{ 
               marginTop: 24, 
+              marginBottom: 24, 
               backgroundColor: '#f8f9fa', 
               borderRadius: 12, 
               padding: 16, 
