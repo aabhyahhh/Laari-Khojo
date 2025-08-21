@@ -268,77 +268,79 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
     vendorData.forEach((vendor, index) => {
       console.log(`Processing vendor ${index + 1}:`, vendor);
       let coords: { latitude: number; longitude: number } | null = null;
-      if (typeof vendor.latitude === 'number' && typeof vendor.longitude === 'number') {
-        // Validate coordinates are in Ahmedabad/Gandhinagar area
-        const isValidAhmedabadCoordinate = (latitude: number, longitude: number): boolean => {
-          const MIN_LAT = 22.5;  // South boundary
-          const MAX_LAT = 23.5;  // North boundary
-          const MIN_LNG = 72.0;  // West boundary
-          const MAX_LNG = 73.0;  // East boundary
-          
-          return latitude >= MIN_LAT && latitude <= MAX_LAT && 
-                 longitude >= MIN_LNG && longitude <= MAX_LNG;
-        };
+      
+      // Helper function to validate coordinates are in Ahmedabad/Gandhinagar area
+      const isValidAhmedabadCoordinate = (latitude: number, longitude: number): boolean => {
+        const MIN_LAT = 22.5;  // South boundary
+        const MAX_LAT = 23.5;  // North boundary
+        const MIN_LNG = 72.0;  // West boundary
+        const MAX_LNG = 73.0;  // East boundary
         
+        return latitude >= MIN_LAT && latitude <= MAX_LAT && 
+               longitude >= MIN_LNG && longitude <= MAX_LNG;
+      };
+      
+      // Helper function to extract coordinates from mapsLink
+      const extractCoordinates = (mapsLink: string | undefined | null) => {
+        // Check if mapsLink exists and is a string
+        if (!mapsLink || typeof mapsLink !== 'string') {
+          return null;
+        }
+        
+        try {
+          const patterns = [
+            /@(-?\d+\.\d+),(-?\d+\.\d+)/, // Standard format
+            /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, // Alternate format
+            /place\/.*\/@(-?\d+\.\d+),(-?\d+\.\d+)/, // Place format
+            /q=(-?\d+\.\d+),(-?\d+\.\d+)/, // Query format
+          ];
+
+          for (const pattern of patterns) {
+            const match = mapsLink.match(pattern);
+            if (match) {
+              const latitude = parseFloat(match[1]);
+              const longitude = parseFloat(match[2]);
+              
+              if (isValidAhmedabadCoordinate(latitude, longitude)) {
+                return { latitude, longitude };
+              } else {
+                console.warn("Coordinates outside Ahmedabad/Gandhinagar area:", { latitude, longitude });
+                return null;
+              }
+            }
+          }
+          return null;
+        } catch (error) {
+          console.error("Error extracting coordinates from mapsLink:", error);
+          return null;
+        }
+      };
+      
+      // 1. Try latitude/longitude fields (from backend - WhatsApp or mapsLink)
+      if (typeof vendor.latitude === 'number' && typeof vendor.longitude === 'number') {
         if (isValidAhmedabadCoordinate(vendor.latitude, vendor.longitude)) {
+          console.log(`Vendor ${vendor.name}: Using ${(vendor as any).locationSource || 'unknown'} location: ${vendor.latitude}, ${vendor.longitude}`);
           coords = { latitude: vendor.latitude, longitude: vendor.longitude };
         } else {
           console.warn(`Vendor ${vendor.name} has invalid coordinates: ${vendor.latitude}, ${vendor.longitude}`);
         }
       } else if (vendor.mapsLink) {
-        // Extract coordinates from mapsLink
-        const extractCoordinates = (mapsLink: string | undefined | null) => {
-          // Check if mapsLink exists and is a string
-          if (!mapsLink || typeof mapsLink !== 'string') {
-            return null;
-          }
-          
-          // Helper function to validate coordinates are in Ahmedabad/Gandhinagar area
-          const isValidAhmedabadCoordinate = (latitude: number, longitude: number): boolean => {
-            const MIN_LAT = 22.5;  // South boundary
-            const MAX_LAT = 23.5;  // North boundary
-            const MIN_LNG = 72.0;  // West boundary
-            const MAX_LNG = 73.0;  // East boundary
-            
-            const isValid = latitude >= MIN_LAT && latitude <= MAX_LAT && 
-                           longitude >= MIN_LNG && longitude <= MAX_LNG;
-            
-            if (!isValid) {
-              console.warn(`Invalid coordinates for Ahmedabad/Gandhinagar: ${latitude}, ${longitude}`);
-            }
-            
-            return isValid;
-          };
-          
-          try {
-            const patterns = [
-              /@(-?\d+\.\d+),(-?\d+\.\d+)/, // Standard format
-              /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, // Alternate format
-              /place\/.*\/@(-?\d+\.\d+),(-?\d+\.\d+)/, // Place format
-              /q=(-?\d+\.\d+),(-?\d+\.\d+)/, // Query format
-            ];
-
-            for (const pattern of patterns) {
-              const match = mapsLink.match(pattern);
-              if (match) {
-                const latitude = parseFloat(match[1]);
-                const longitude = parseFloat(match[2]);
-                
-                if (isValidAhmedabadCoordinate(latitude, longitude)) {
-                  return { latitude, longitude };
-                } else {
-                  console.warn("Coordinates outside Ahmedabad/Gandhinagar area:", { latitude, longitude });
-                  return null;
-                }
-              }
-            }
-            return null;
-          } catch (error) {
-            console.error("Error extracting coordinates from mapsLink:", error);
-            return null;
-          }
-        };
+        // 2. Try mapsLink extraction (fallback)
         coords = extractCoordinates(vendor.mapsLink);
+        if (coords) {
+          console.log(`Vendor ${vendor.name}: Using mapsLink fallback: ${coords.latitude}, ${coords.longitude}`);
+        }
+      } else if ((vendor as any).location && Array.isArray((vendor as any).location.coordinates) && (vendor as any).location.coordinates.length === 2) {
+        // 3. Try location.coordinates (legacy WhatsApp pin format)
+        const lat = (vendor as any).location.coordinates[1];
+        const lng = (vendor as any).location.coordinates[0];
+        
+        if (isValidAhmedabadCoordinate(lat, lng)) {
+          console.log(`Vendor ${vendor.name}: Using legacy location.coordinates: ${lat}, ${lng}`);
+          coords = { latitude: lat, longitude: lng };
+        } else {
+          console.warn(`Vendor ${vendor.name} has invalid location coordinates: ${lat}, ${lng}`);
+        }
       }
         if (coords) {
           console.log(`Adding marker for ${vendor.name} at:`, coords);
@@ -636,11 +638,15 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
               }}>
                 {/* Directions Button: open Google Maps directions from user location to vendor */}
                 {(() => {
-                  // Use vendor coordinates only (no userLocation in preview)
+                  // Use vendor coordinates with priority: WhatsApp location > mapsLink > legacy location
                   let vendorCoords = null;
-                  if (selectedVendor.mapsLink) {
+                  
+                  // 1. Try latitude/longitude fields (from backend - WhatsApp or mapsLink)
+                  if (typeof selectedVendor.latitude === 'number' && typeof selectedVendor.longitude === 'number') {
+                    vendorCoords = { latitude: selectedVendor.latitude, longitude: selectedVendor.longitude };
+                  } else if (selectedVendor.mapsLink) {
+                    // 2. Try mapsLink extraction (fallback)
                     const extractCoordinates = (mapsLink: string | undefined | null) => {
-                      // Check if mapsLink exists and is a string
                       if (!mapsLink || typeof mapsLink !== 'string') {
                         return null;
                       }
@@ -663,10 +669,13 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
                       return null;
                     };
                     vendorCoords = extractCoordinates(selectedVendor.mapsLink);
+                  } else if ((selectedVendor as any).location && Array.isArray((selectedVendor as any).location.coordinates) && (selectedVendor as any).location.coordinates.length === 2) {
+                    // 3. Try location.coordinates (legacy WhatsApp pin format)
+                    const lat = (selectedVendor as any).location.coordinates[1];
+                    const lng = (selectedVendor as any).location.coordinates[0];
+                    vendorCoords = { latitude: lat, longitude: lng };
                   }
-                  if (!vendorCoords && typeof selectedVendor.latitude === 'number' && typeof selectedVendor.longitude === 'number') {
-                    vendorCoords = { latitude: selectedVendor.latitude, longitude: selectedVendor.longitude };
-                  }
+                  
                   let directionsUrl = '#';
                   if (vendorCoords) {
                     directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${vendorCoords.latitude},${vendorCoords.longitude}&travelmode=driving`;
@@ -1319,31 +1328,46 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
             vendorName={selectedVendor.name || 'Unknown Vendor'}
             vendorId={selectedVendor._id}
             vendorLocation={(() => {
-              const extractCoordinates = (mapsLink: string | undefined | null) => {
-                if (!mapsLink || typeof mapsLink !== 'string') return null;
-                try {
-                  const patterns = [
-                    /@(-?\d+\.\d+),(-?\d+\.\d+)/,
-                    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
-                    /place\/.*\/@(-?\d+\.\d+),(-?\d+\.\d+)/,
-                    /q=(-?\d+\.\d+),(-?\d+\.\d+)/,
-                  ];
-                  for (const pattern of patterns) {
-                    const match = mapsLink.match(pattern);
-                    if (match) {
-                      return {
-                        latitude: parseFloat(match[1]),
-                        longitude: parseFloat(match[2]),
-                      };
+              // Use vendor coordinates with priority: WhatsApp location > mapsLink > legacy location
+              let vendorCoords = null;
+              
+              // 1. Try latitude/longitude fields (from backend - WhatsApp or mapsLink)
+              if (typeof selectedVendor.latitude === 'number' && typeof selectedVendor.longitude === 'number') {
+                vendorCoords = { latitude: selectedVendor.latitude, longitude: selectedVendor.longitude };
+              } else if (selectedVendor.mapsLink) {
+                // 2. Try mapsLink extraction (fallback)
+                const extractCoordinates = (mapsLink: string | undefined | null) => {
+                  if (!mapsLink || typeof mapsLink !== 'string') return null;
+                  try {
+                    const patterns = [
+                      /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+                      /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+                      /place\/.*\/@(-?\d+\.\d+),(-?\d+\.\d+)/,
+                      /q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+                    ];
+                    for (const pattern of patterns) {
+                      const match = mapsLink.match(pattern);
+                      if (match) {
+                        return {
+                          latitude: parseFloat(match[1]),
+                          longitude: parseFloat(match[2]),
+                        };
+                      }
                     }
+                    return null;
+                  } catch (error) {
+                    return null;
                   }
-                  return null;
-                } catch (error) {
-                  return null;
-                }
-              };
-              const coords = extractCoordinates(selectedVendor.mapsLink);
-              return coords ? `${coords.latitude}, ${coords.longitude}` : 'Location not available';
+                };
+                vendorCoords = extractCoordinates(selectedVendor.mapsLink);
+              } else if ((selectedVendor as any).location && Array.isArray((selectedVendor as any).location.coordinates) && (selectedVendor as any).location.coordinates.length === 2) {
+                // 3. Try location.coordinates (legacy WhatsApp pin format)
+                const lat = (selectedVendor as any).location.coordinates[1];
+                const lng = (selectedVendor as any).location.coordinates[0];
+                vendorCoords = { latitude: lat, longitude: lng };
+              }
+              
+              return vendorCoords ? `${vendorCoords.latitude}, ${vendorCoords.longitude}` : 'Location not available';
             })()}
             vendorArea="Area not specified"
             userLocation="User location not available"

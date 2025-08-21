@@ -208,6 +208,9 @@ function MapDisplay() {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
+  // Responsive state for screen size
+  const [isMobileOrTablet, setIsMobileOrTablet] = useState<boolean>(false);
+
   const navigate = useNavigate();
 
   // Auto-rotation for carousel
@@ -237,6 +240,22 @@ function MapDisplay() {
   useEffect(() => {
     setCurrentImageIndex(0);
   }, [selectedVendor?._id]);
+
+  // Detect screen size changes for responsive behavior
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobileOrTablet(window.innerWidth <= 1024);
+    };
+
+    // Check initial screen size
+    checkScreenSize();
+
+    // Add event listener for window resize
+    window.addEventListener('resize', checkScreenSize);
+
+    // Cleanup event listener
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   // Filter vendors based on active filters and open status
   const applyFilters = (vendorList: Vendor[]) => {
@@ -1334,27 +1353,32 @@ function MapDisplay() {
 
   // Replace all coordinate extraction logic for vendors in MapDisplay with the following helper:
   const getVendorCoordinates = (vendor: Vendor): { latitude: number; longitude: number } | null => {
-    // 1. Try mapsLink extraction
-    if (vendor.mapsLink) {
-      const coords = extractCoordinates(vendor.mapsLink);
-      if (coords) return coords;
-    }
-    
-    // 2. Try latitude/longitude fields (with validation)
+    // 1. Try latitude/longitude fields (from backend - WhatsApp or mapsLink)
     if (typeof vendor.latitude === 'number' && typeof vendor.longitude === 'number') {
       if (isValidAhmedabadCoordinate(vendor.latitude, vendor.longitude)) {
+        console.log(`Vendor ${vendor.name}: Using ${(vendor as any).locationSource || 'unknown'} location: ${vendor.latitude}, ${vendor.longitude}`);
         return { latitude: vendor.latitude, longitude: vendor.longitude };
       } else {
         console.warn(`Vendor ${vendor.name} has invalid coordinates: ${vendor.latitude}, ${vendor.longitude}`);
       }
     }
     
-    // 3. Try location.coordinates (WhatsApp pin)
+    // 2. Try mapsLink extraction (fallback)
+    if (vendor.mapsLink) {
+      const coords = extractCoordinates(vendor.mapsLink);
+      if (coords) {
+        console.log(`Vendor ${vendor.name}: Using mapsLink fallback: ${coords.latitude}, ${coords.longitude}`);
+        return coords;
+      }
+    }
+    
+    // 3. Try location.coordinates (legacy WhatsApp pin format)
     if ((vendor as any).location && Array.isArray((vendor as any).location.coordinates) && (vendor as any).location.coordinates.length === 2) {
       const lat = (vendor as any).location.coordinates[1];
       const lng = (vendor as any).location.coordinates[0];
       
       if (isValidAhmedabadCoordinate(lat, lng)) {
+        console.log(`Vendor ${vendor.name}: Using legacy location.coordinates: ${lat}, ${lng}`);
         return { latitude: lat, longitude: lng };
       } else {
         console.warn(`Vendor ${vendor.name} has invalid location coordinates: ${lat}, ${lng}`);
@@ -2024,8 +2048,8 @@ function MapDisplay() {
         </button>
       </div>
       
-      {/* Mobile Filter Panel - Appears at bottom of page */}
-      {showFilters && (
+      {/* Mobile Filter Panel - Appears at bottom of page (only on mobile/tablet) */}
+      {showFilters && isMobileOrTablet && (
         <>
           {/* Mobile backdrop overlay */}
           <div 
@@ -2041,7 +2065,7 @@ function MapDisplay() {
             }}
             onClick={() => setShowFilters(false)}
           />
-          <div className="filter-panel" style={{
+          <div className="filter-panel mobile-filter-panel" style={{
             position: 'fixed',
             bottom: 0,
             left: 0,

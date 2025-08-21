@@ -1,4 +1,5 @@
 const User = require("../models/userModel");
+const VendorLocation = require('../models/vendorLocationModel');
 
 const { validationResult } = require("express-validator");
 
@@ -186,10 +187,53 @@ const getProfile = async (req, res) => {
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({}, { password: 0 }); // Exclude passwords
+    
+    // Get all vendor locations from WhatsApp
+    const vendorLocations = await VendorLocation.find({});
+    
+    // Create a map of phone numbers to location data
+    const locationMap = new Map();
+    vendorLocations.forEach(loc => {
+      locationMap.set(loc.phone, {
+        latitude: loc.location.lat,
+        longitude: loc.location.lng,
+        updatedAt: loc.updatedAt
+      });
+    });
+    
+    // Merge location data with user data
+    const usersWithLocation = users.map(user => {
+      const userData = user.toObject();
+      const locationData = locationMap.get(user.contactNumber);
+      
+      if (locationData) {
+        // If WhatsApp location exists, use it (it's more recent/accurate)
+        userData.latitude = locationData.latitude;
+        userData.longitude = locationData.longitude;
+        userData.locationUpdatedAt = locationData.updatedAt;
+        userData.locationSource = 'whatsapp';
+      } else if (user.mapsLink) {
+        // Fallback to mapsLink coordinates if no WhatsApp location
+        try {
+          const mapsRegex = /@([-+]?\d*\.\d+),([-+]?\d*\.\d+)/;
+          const match = user.mapsLink.match(mapsRegex);
+          if (match) {
+            userData.latitude = parseFloat(match[1]);
+            userData.longitude = parseFloat(match[2]);
+            userData.locationSource = 'mapsLink';
+          }
+        } catch (error) {
+          console.error(`Error parsing mapsLink for user ${user._id}:`, error);
+        }
+      }
+      
+      return userData;
+    });
+    
     return res.status(200).json({
       success: true,
       msg: "All Laari Vendors",
-      data: users,
+      data: usersWithLocation,
     });
   } catch (error) {
     return res.status(500).json({ success: false, msg: "Error fetching users", error: error.message });

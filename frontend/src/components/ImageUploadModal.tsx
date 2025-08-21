@@ -1,6 +1,13 @@
 import React, { useState, useRef } from 'react';
 // import api from '../api/client';
 
+// Helper function to get API base URL
+const getApiBaseUrl = () => {
+  return import.meta.env.VITE_API_URL || (import.meta.env.DEV 
+    ? 'http://localhost:3000' 
+    : 'https://laari-khojo-backend.onrender.com');
+};
+
 interface ImageUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -35,7 +42,7 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({ isOpen, onClose, up
     setError('');
 
     try {
-      const response = await fetch(`${import.meta.env.DEV ? 'http://localhost:3000' : 'https://laari-khojo-backend.onrender.com'}/api/send-otp`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,7 +75,7 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({ isOpen, onClose, up
     setError('');
 
     try {
-      const response = await fetch(`${import.meta.env.DEV ? 'http://localhost:3000' : 'https://laari-khojo-backend.onrender.com'}/api/verify-otp`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +141,7 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({ isOpen, onClose, up
       if (uploadType === 'profile') {
         formData.append('image', selectedFiles[0]);
         
-        const response = await fetch(`${import.meta.env.DEV ? 'http://localhost:3000' : 'https://laari-khojo-backend.onrender.com'}/api/upload-profile-picture`, {
+        const response = await fetch(`${getApiBaseUrl()}/api/upload-profile-picture`, {
           method: 'POST',
           body: formData,
         });
@@ -156,7 +163,7 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({ isOpen, onClose, up
           formData.append('images', file);
         });
 
-        const response = await fetch(`${import.meta.env.DEV ? 'http://localhost:3000' : 'https://laari-khojo-backend.onrender.com'}/api/upload-carousel-images`, {
+        const response = await fetch(`${getApiBaseUrl()}/api/upload-carousel-images`, {
           method: 'POST',
           body: formData,
         });
@@ -544,7 +551,7 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({ isOpen, onClose, up
                           }
                           
                           try {
-                            const response = await fetch(`${import.meta.env.DEV ? 'http://localhost:3000' : 'https://laari-khojo-backend.onrender.com'}/api/delete-profile-picture`, {
+                            const response = await fetch(`${getApiBaseUrl()}/api/delete-profile-picture`, {
                               method: 'DELETE',
                               headers: {
                                 'Content-Type': 'application/json',
@@ -630,7 +637,7 @@ const ImageUploadModal: React.FC<ImageUploadModalProps> = ({ isOpen, onClose, up
                           type="button"
                           onClick={async () => {
                             try {
-                              const response = await fetch(`${import.meta.env.DEV ? 'http://localhost:3000' : 'https://laari-khojo-backend.onrender.com'}/api/delete-carousel-image`, {
+                              const response = await fetch(`${getApiBaseUrl()}/api/delete-carousel-image`, {
                                 method: 'DELETE',
                                 headers: {
                                   'Content-Type': 'application/json',

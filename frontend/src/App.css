@@ -260,6 +260,17 @@
     width: calc(100vw - 400px) !important;
     max-width: 600px !important;
   }
+  
+  /* Hide mobile filter panel and backdrop on desktop/laptop screens */
+  /* Only hide the mobile-specific filter panel, not the desktop dropdown */
+  .mobile-filter-backdrop {
+    display: none !important;
+  }
+  
+  /* Hide mobile filter panel on desktop/laptop screens */
+  .mobile-filter-panel {
+    display: none !important;
+  }
 }
 
 /* Small mobile adjustments */
