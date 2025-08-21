@@ -208,6 +208,9 @@ function MapDisplay() {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
+  // Responsive state for screen size
+  const [isMobileOrTablet, setIsMobileOrTablet] = useState<boolean>(false);
+
   const navigate = useNavigate();
 
   // Auto-rotation for carousel
@@ -237,6 +240,22 @@ function MapDisplay() {
   useEffect(() => {
     setCurrentImageIndex(0);
   }, [selectedVendor?._id]);
+
+  // Detect screen size changes for responsive behavior
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobileOrTablet(window.innerWidth <= 1024);
+    };
+
+    // Check initial screen size
+    checkScreenSize();
+
+    // Add event listener for window resize
+    window.addEventListener('resize', checkScreenSize);
+
+    // Cleanup event listener
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   // Filter vendors based on active filters and open status
   const applyFilters = (vendorList: Vendor[]) => {
@@ -2024,8 +2043,8 @@ function MapDisplay() {
         </button>
       </div>
       
-      {/* Mobile Filter Panel - Appears at bottom of page */}
-      {showFilters && (
+      {/* Mobile Filter Panel - Appears at bottom of page (only on mobile/tablet) */}
+      {showFilters && isMobileOrTablet && (
         <>
           {/* Mobile backdrop overlay */}
           <div 
@@ -2041,7 +2060,7 @@ function MapDisplay() {
             }}
             onClick={() => setShowFilters(false)}
           />
-          <div className="filter-panel" style={{
+          <div className="filter-panel mobile-filter-panel" style={{
             position: 'fixed',
             bottom: 0,
             left: 0,

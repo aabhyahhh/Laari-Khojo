@@ -37,9 +37,9 @@ export interface Review {
 // Create axios instance with default config
 const createAxiosInstance = (): AxiosInstance => {
   const instance = axios.create({
-    baseURL: import.meta.env.DEV 
+    baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV 
       ? 'http://localhost:3000' 
-      : 'https://laari-khojo-backend.onrender.com',
+      : 'https://laari-khojo-backend.onrender.com'),
     timeout: 10000, // 10 seconds timeout
     headers: {
       'Content-Type': 'application/json',
