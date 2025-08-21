@@ -121,6 +121,39 @@ export const api = {
   // Add other API methods as needed
 };
 
+// Helper function to extract coordinates from mapsLink
+function extractCoordinates(mapsLink: string): { latitude: number; longitude: number } | null {
+  if (!mapsLink || typeof mapsLink !== 'string') {
+    return null;
+  }
+  
+  try {
+    const patterns = [
+      /@(-?\d+\.\d+),(-?\d+\.\d+)/, // Standard format
+      /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, // Alternate format
+      /place\/.*\/@(-?\d+\.\d+),(-?\d+\.\d+)/, // Place format
+      /q=(-?\d+\.\d+),(-?\d+\.\d+)/, // Query format
+    ];
+
+    for (const pattern of patterns) {
+      const match = mapsLink.match(pattern);
+      if (match) {
+        const latitude = parseFloat(match[1]);
+        const longitude = parseFloat(match[2]);
+        
+        // Validate coordinates are in reasonable range
+        if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
+          return { latitude, longitude };
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Error extracting coordinates from mapsLink:", error);
+    return null;
+  }
+}
+
 // Helper function to derive food type from vendor data
 function deriveVendorFoodType(vendor: any): string {
   // If foodType is already set and valid, use it
@@ -269,19 +302,29 @@ export function normalizeVendor(vendor: any): Vendor & { latitude?: number; long
     console.log(`Vendor ${vendor.name}: Food type: ${normalizedVendor.foodType}, Categories:`, normalizedVendor.category, 'from dishes:', vendor.bestDishes.map((d: any) => d.name));
   }
   
-  // If latitude/longitude already present, return as is
+  // Handle location data with priority: WhatsApp location > mapsLink > location.coordinates
   if (typeof vendor.latitude === 'number' && typeof vendor.longitude === 'number') {
-    return normalizedVendor;
+    // Backend now provides latitude/longitude directly (from WhatsApp or mapsLink)
+    normalizedVendor.latitude = vendor.latitude;
+    normalizedVendor.longitude = vendor.longitude;
+    console.log(`Vendor ${vendor.name}: Using ${vendor.locationSource || 'unknown'} location: ${vendor.latitude}, ${vendor.longitude}`);
+  } else if (vendor.mapsLink) {
+    // Fallback to mapsLink extraction
+    const coords = extractCoordinates(vendor.mapsLink);
+    if (coords) {
+      normalizedVendor.latitude = coords.latitude;
+      normalizedVendor.longitude = coords.longitude;
+      console.log(`Vendor ${vendor.name}: Using mapsLink location: ${coords.latitude}, ${coords.longitude}`);
+    }
+  } else if (vendor.location && Array.isArray(vendor.location.coordinates) && vendor.location.coordinates.length === 2) {
+    // Legacy location.coordinates format
+    const lat = vendor.location.coordinates[1];
+    const lng = vendor.location.coordinates[0];
+    normalizedVendor.latitude = lat;
+    normalizedVendor.longitude = lng;
+    console.log(`Vendor ${vendor.name}: Using legacy location.coordinates: ${lat}, ${lng}`);
   }
-  // If location.coordinates exists, map to lat/lng
-  if (vendor.location && Array.isArray(vendor.location.coordinates) && vendor.location.coordinates.length === 2) {
-    return {
-      ...normalizedVendor,
-      latitude: vendor.location.coordinates[1],
-      longitude: vendor.location.coordinates[0],
-    };
-  }
-  // Otherwise, return as is
+  
   return normalizedVendor;
 }
 

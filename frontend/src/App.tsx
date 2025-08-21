@@ -1353,27 +1353,32 @@ function MapDisplay() {
 
   // Replace all coordinate extraction logic for vendors in MapDisplay with the following helper:
   const getVendorCoordinates = (vendor: Vendor): { latitude: number; longitude: number } | null => {
-    // 1. Try mapsLink extraction
-    if (vendor.mapsLink) {
-      const coords = extractCoordinates(vendor.mapsLink);
-      if (coords) return coords;
-    }
-    
-    // 2. Try latitude/longitude fields (with validation)
+    // 1. Try latitude/longitude fields (from backend - WhatsApp or mapsLink)
     if (typeof vendor.latitude === 'number' && typeof vendor.longitude === 'number') {
       if (isValidAhmedabadCoordinate(vendor.latitude, vendor.longitude)) {
+        console.log(`Vendor ${vendor.name}: Using ${(vendor as any).locationSource || 'unknown'} location: ${vendor.latitude}, ${vendor.longitude}`);
         return { latitude: vendor.latitude, longitude: vendor.longitude };
       } else {
         console.warn(`Vendor ${vendor.name} has invalid coordinates: ${vendor.latitude}, ${vendor.longitude}`);
       }
     }
     
-    // 3. Try location.coordinates (WhatsApp pin)
+    // 2. Try mapsLink extraction (fallback)
+    if (vendor.mapsLink) {
+      const coords = extractCoordinates(vendor.mapsLink);
+      if (coords) {
+        console.log(`Vendor ${vendor.name}: Using mapsLink fallback: ${coords.latitude}, ${coords.longitude}`);
+        return coords;
+      }
+    }
+    
+    // 3. Try location.coordinates (legacy WhatsApp pin format)
     if ((vendor as any).location && Array.isArray((vendor as any).location.coordinates) && (vendor as any).location.coordinates.length === 2) {
       const lat = (vendor as any).location.coordinates[1];
       const lng = (vendor as any).location.coordinates[0];
       
       if (isValidAhmedabadCoordinate(lat, lng)) {
+        console.log(`Vendor ${vendor.name}: Using legacy location.coordinates: ${lat}, ${lng}`);
         return { latitude: lat, longitude: lng };
       } else {
         console.warn(`Vendor ${vendor.name} has invalid location coordinates: ${lat}, ${lng}`);

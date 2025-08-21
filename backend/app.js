@@ -7,6 +7,7 @@ const http = require("http");
 const MONGO_URI = process.env.MONGO_URI;
 const axios = require('axios'); // ✅ Add this at the top
 const User = require('./models/userModel');
+const VendorLocation = require('./models/vendorLocationModel');
 
 const authRoutes = require("./routes/authRoute");
 const webhookRoutes = require("./routes/webhookRoute");
@@ -89,7 +90,50 @@ app.get("/api/all-users", async (req, res) => {
       .limit(100)
       .sort({ updatedAt: -1 })
       .select('-password'); // Exclude password field for security
-    res.json({ data: vendors });
+    
+    // Get all vendor locations from WhatsApp
+    const vendorLocations = await VendorLocation.find({});
+    
+    // Create a map of phone numbers to location data
+    const locationMap = new Map();
+    vendorLocations.forEach(loc => {
+      locationMap.set(loc.phone, {
+        latitude: loc.location.lat,
+        longitude: loc.location.lng,
+        updatedAt: loc.updatedAt
+      });
+    });
+    
+    // Merge location data with vendor data
+    const vendorsWithLocation = vendors.map(vendor => {
+      const vendorData = vendor.toObject();
+      const locationData = locationMap.get(vendor.contactNumber);
+      
+      if (locationData) {
+        // If WhatsApp location exists, use it (it's more recent/accurate)
+        vendorData.latitude = locationData.latitude;
+        vendorData.longitude = locationData.longitude;
+        vendorData.locationUpdatedAt = locationData.updatedAt;
+        vendorData.locationSource = 'whatsapp';
+      } else if (vendor.mapsLink) {
+        // Fallback to mapsLink coordinates if no WhatsApp location
+        try {
+          const mapsRegex = /@([-+]?\d*\.\d+),([-+]?\d*\.\d+)/;
+          const match = vendor.mapsLink.match(mapsRegex);
+          if (match) {
+            vendorData.latitude = parseFloat(match[1]);
+            vendorData.longitude = parseFloat(match[2]);
+            vendorData.locationSource = 'mapsLink';
+          }
+        } catch (error) {
+          console.error(`Error parsing mapsLink for vendor ${vendor._id}:`, error);
+        }
+      }
+      
+      return vendorData;
+    });
+    
+    res.json({ data: vendorsWithLocation });
   } catch (error) {
     console.error('Error fetching vendors:', error);
     res.status(500).json({ error: "Failed to fetch vendors" });
