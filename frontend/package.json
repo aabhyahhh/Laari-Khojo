@@ -8,7 +8,12 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "postbuild": "node scripts/copy-htaccess.js"
+    "postbuild": "node scripts/ensure-htaccess.js",
+    "verify": "node scripts/verify-upload.js",
+    "zip": "node scripts/create-upload-zip.js",
+    "fix-htaccess": "node scripts/fix-htaccess-upload.js",
+    "create-visible-htaccess": "node scripts/create-visible-htaccess.js",
+    "build:hostinger": "npm run build && npm run verify && npm run zip && npm run create-visible-htaccess"
   },
   "dependencies": {
     "@fortawesome/free-solid-svg-icons": "^6.7.2",

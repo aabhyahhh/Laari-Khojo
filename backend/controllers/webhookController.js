@@ -1,6 +1,13 @@
 const VERIFY_TOKEN = "laarik";
 const VendorLocation = require('../models/vendorLocationModel');
+const User = require('../models/userModel');
 const twilio = require('twilio');
+const { 
+  sendPhotoUploadInvitation, 
+  sendPhotoUploadConfirmation, 
+  generateVendorUploadUrl,
+  formatPhoneNumber 
+} = require('../services/whatsappService');
 
 // Initialize Twilio client
 const twilioClient = twilio(
@@ -85,6 +92,47 @@ const handleLocationMessage = async (message) => {
   }
 };
 
+const handleButtonClick = async (message) => {
+  try {
+    const { from, interactive } = message;
+    const buttonId = interactive.button_reply.id;
+    const buttonTitle = interactive.button_reply.title;
+    
+    console.log('Button clicked:', { from, buttonId, buttonTitle });
+    
+    // Handle photo upload button click
+    if (buttonTitle === '📤 Upload Photo') {
+      // Find vendor by phone number
+      const vendor = await User.findOne({ contactNumber: from });
+      
+      if (!vendor) {
+        console.log('Vendor not found for phone number:', from);
+        return false;
+      }
+      
+      // Generate vendor-specific upload URL
+      const uploadUrl = generateVendorUploadUrl(from);
+      
+      // Send confirmation with upload link
+      const confirmationMessage = `✅ Great! Click the link below to upload your photos:\n\n${uploadUrl}\n\nThis will take you directly to your vendor dashboard where you can upload your profile picture and business images.`;
+      
+      await twilioClient.messages.create({
+        body: confirmationMessage,
+        from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+        to: `whatsapp:${from}`
+      });
+      
+      console.log('Photo upload link sent to vendor:', from);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error handling button click:', error);
+    return false;
+  }
+};
+
 const handleWebhook = async (req, res) => {
   const body = req.body;
 
@@ -114,8 +162,12 @@ const handleWebhook = async (req, res) => {
 
       // Process each message
       for (const message of messages) {
+        // Handle interactive button clicks
+        if (message.type === 'interactive' && message.interactive?.type === 'button_reply') {
+          await handleButtonClick(message);
+        }
         // Handle location messages
-        if (message.type === 'location') {
+        else if (message.type === 'location') {
           await handleLocationMessage(message);
         }
         // Add other message type handlers here as needed

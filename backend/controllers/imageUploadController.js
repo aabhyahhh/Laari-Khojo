@@ -1,6 +1,7 @@
 const User = require("../models/userModel");
 const cloudinary = require("../cloudinaryConfig");
 const multer = require("multer");
+const { sendPhotoUploadConfirmation } = require('../services/whatsappService');
 
 // Configure multer for memory storage
 const upload = multer({
@@ -96,6 +97,18 @@ const uploadProfilePicture = async (req, res) => {
       });
     }
 
+    // Send WhatsApp confirmation message
+    try {
+      await sendPhotoUploadConfirmation(
+        normalizedPhoneNumber, 
+        vendor.name || vendor.businessName || 'Vendor'
+      );
+      console.log('✅ WhatsApp confirmation sent for profile picture upload');
+    } catch (whatsappError) {
+      console.error('❌ Error sending WhatsApp confirmation:', whatsappError.message);
+      // Don't fail the upload if WhatsApp notification fails
+    }
+
     return res.status(200).json({
       success: true,
       msg: "Profile picture uploaded successfully",
@@ -151,24 +164,14 @@ const uploadCarouselImages = async (req, res) => {
     }
 
     // Upload all images to Cloudinary
-    const uploadPromises = files.map(file => 
-      uploadToCloudinary(file.buffer, 'carousel')
-    );
-
+    const uploadPromises = files.map(file => uploadToCloudinary(file.buffer, 'carousel'));
     const uploadResults = await Promise.all(uploadPromises);
     const imageUrls = uploadResults.map(result => result.secure_url);
 
-    // Add new images to carousel (don't replace existing ones)
-    if (!vendor.carouselImages) {
-      vendor.carouselImages = [];
-    }
-    
-    const updatedCarouselImages = [...(vendor.carouselImages || []), ...imageUrls];
-
-    // Update carousel images using findOneAndUpdate to avoid validation issues
+    // Update vendor carousel images
     const updatedVendor = await User.findOneAndUpdate(
       { contactNumber: normalizedPhoneNumber },
-      { carouselImages: updatedCarouselImages },
+      { carouselImages: imageUrls },
       { new: true, runValidators: false }
     );
 
@@ -179,12 +182,23 @@ const uploadCarouselImages = async (req, res) => {
       });
     }
 
+    // Send WhatsApp confirmation message
+    try {
+      await sendPhotoUploadConfirmation(
+        normalizedPhoneNumber, 
+        vendor.name || vendor.businessName || 'Vendor'
+      );
+      console.log('✅ WhatsApp confirmation sent for carousel images upload');
+    } catch (whatsappError) {
+      console.error('❌ Error sending WhatsApp confirmation:', whatsappError.message);
+      // Don't fail the upload if WhatsApp notification fails
+    }
+
     return res.status(200).json({
       success: true,
       msg: "Carousel images uploaded successfully",
       data: {
-        carouselImages: updatedCarouselImages,
-        newImages: imageUrls
+        carouselImages: imageUrls
       }
     });
 
