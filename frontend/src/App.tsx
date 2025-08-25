@@ -6,6 +6,8 @@ import UpdateProfile from "./components/UpdateProfile";
 import Login from "./components/Login";
 import ImageUploadModal from "./components/ImageUploadModal";
 import ReportLocationModal from "./components/ReportLocationModal";
+import VendorUploadPage from "./components/VendorUploadPage";
+import AdminPanel from "./components/AdminPanel";
 import laari from "./assets/logo_cropped.png";
 import logo from "./assets/logo.png";
 import { useEffect, useRef, useState } from "react";
@@ -212,6 +214,9 @@ function MapDisplay() {
   const [isMobileOrTablet, setIsMobileOrTablet] = useState<boolean>(false);
 
   const navigate = useNavigate();
+
+  // Admin panel state
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   // Auto-rotation for carousel
   useEffect(() => {
@@ -1560,8 +1565,22 @@ function MapDisplay() {
     setTouchEnd(null);
   };
 
+  // Admin panel keyboard shortcut
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Ctrl/Cmd + Shift + A to open admin panel
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'A') {
+        event.preventDefault();
+        setShowAdminPanel(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100vh", width: "100vw", position: "relative" }}>
       {/* Top bar: Logo and Search Bar with Buttons */}
       <div
         style={{
@@ -3312,6 +3331,36 @@ function MapDisplay() {
           userLocation={userLocation ? `${userLocation.latitude}, ${userLocation.longitude}` : 'User location not available'}
         />
       )}
+
+      {/* Admin Panel */}
+      <AdminPanel
+        isOpen={showAdminPanel}
+        onClose={() => setShowAdminPanel(false)}
+      />
+
+      {/* Hidden Admin Button (for accessibility) */}
+      <button
+        onClick={() => setShowAdminPanel(true)}
+        style={{
+          position: 'fixed',
+          top: '10px',
+          right: '10px',
+          width: '40px',
+          height: '40px',
+          backgroundColor: 'rgba(0,0,0,0.1)',
+          border: 'none',
+          borderRadius: '50%',
+          cursor: 'pointer',
+          zIndex: 1000,
+          opacity: 0.3,
+          transition: 'opacity 0.2s'
+        }}
+        onMouseEnter={(e) => (e.target as HTMLButtonElement).style.opacity = '0.8'}
+        onMouseLeave={(e) => (e.target as HTMLButtonElement).style.opacity = '0.3'}
+        title="Admin Panel (Ctrl+Shift+A)"
+      >
+        ⚙️
+      </button>
     </div>
   );
 }
@@ -3332,6 +3381,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomeScreen />} />
           <Route path="/map" element={<MapDisplay />} />
+          <Route path="/vendor-upload" element={<VendorUploadPage />} />
           <Route
             path="/register"
             element={<Register onRegisterSuccess={() => {}} />}

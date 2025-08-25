@@ -167,11 +167,102 @@ You can update your location anytime by sending a new location.`;
   return sendWhatsAppMessage(to, message);
 };
 
+// Send WhatsApp message with interactive buttons
+const sendWhatsAppInteractiveMessage = async (to, message, buttons) => {
+  try {
+    if (!twilioClient) {
+      throw new Error('Twilio client not initialized. Check environment variables.');
+    }
+    
+    const formattedNumber = formatPhoneNumber(to);
+    if (!formattedNumber) {
+      throw new Error('Invalid phone number format');
+    }
+    
+    console.log('📤 Sending WhatsApp interactive message to:', formattedNumber);
+    console.log('📝 Message:', message);
+    console.log('🔘 Buttons:', buttons);
+    
+    // Create interactive message with buttons
+    const interactiveMessage = {
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: {
+          text: message
+        },
+        action: {
+          buttons: buttons.map((button, index) => ({
+            type: 'reply',
+            reply: {
+              id: `btn_${index}`,
+              title: button.title
+            }
+          }))
+        }
+      }
+    };
+    
+    const response = await twilioClient.messages.create({
+      from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+      to: `whatsapp:${formattedNumber}`,
+      contentSid: null, // We'll use the interactive message directly
+      ...interactiveMessage
+    });
+
+    console.log('✅ Interactive message sent successfully:', response.sid);
+    return response;
+  } catch (error) {
+    console.error('❌ Error sending WhatsApp interactive message:', error.message);
+    console.error('❌ Error details:', error);
+    throw error;
+  }
+};
+
+// Send photo upload invitation message
+const sendPhotoUploadInvitation = async (to, vendorName) => {
+  try {
+    // Use template message with phone number variable
+    const templateId = process.env.WHATSAPP_PHOTO_UPLOAD_TEMPLATE_ID || 'your_template_id_here';
+    const variables = {
+      '1': to // Phone number variable
+    };
+    
+    return await sendWhatsAppTemplateMessage(to, templateId, variables);
+  } catch (error) {
+    console.error('❌ Error sending photo upload invitation:', error.message);
+    throw error;
+  }
+};
+
+// Send photo upload confirmation message
+const sendPhotoUploadConfirmation = async (to, vendorName) => {
+  try {
+    const message = `✅ Your photo has been uploaded successfully! Customers will now see your laari on the map with your picture.`;
+    
+    return await sendWhatsAppMessage(to, message);
+  } catch (error) {
+    console.error('❌ Error sending photo upload confirmation:', error.message);
+    throw error;
+  }
+};
+
+// Generate vendor-specific upload URL
+const generateVendorUploadUrl = (phoneNumber) => {
+  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const encodedPhone = encodeURIComponent(phoneNumber);
+  return `${baseUrl}/vendor-upload?phone=${encodedPhone}`;
+};
+
 module.exports = {
   sendWhatsAppMessage,
   sendWhatsAppTemplateMessage,
   sendReviewNotification,
   sendLocationConfirmation,
+  sendWhatsAppInteractiveMessage,
+  sendPhotoUploadInvitation,
+  sendPhotoUploadConfirmation,
+  generateVendorUploadUrl,
   formatPhoneNumber,
   validateTwilioConfig
 }; 
