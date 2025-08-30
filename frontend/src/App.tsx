@@ -3382,6 +3382,8 @@ function App() {
           <Route path="/" element={<HomeScreen />} />
           <Route path="/map" element={<MapDisplay />} />
           <Route path="/vendor-upload" element={<VendorUploadPage />} />
+          <Route path="/upload" element={<VendorUploadPage />} />
+          <Route path="/vendor" element={<VendorUploadPage />} />
           <Route
             path="/register"
             element={<Register onRegisterSuccess={() => {}} />}

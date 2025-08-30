@@ -5,7 +5,7 @@ async function testWhatsAppDirect() {
   console.log('🧪 Testing WhatsApp Photo Upload Service Directly\n');
   
   // Test phone number (replace with actual test vendor phone number)
-  const testPhoneNumber = process.env.TEST_PHONE_NUMBER || '918130026321';
+  const testPhoneNumber = '+918130026321';
   const normalizedPhoneNumber = testPhoneNumber.startsWith('+91') ? testPhoneNumber : `+91${testPhoneNumber}`;
   
   console.log('📱 Testing with phone number:', normalizedPhoneNumber);
