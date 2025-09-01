@@ -1,6 +1,6 @@
 const Review = require('../models/reviewModel');
 const User = require('../models/userModel');
-const { sendReviewNotification, formatPhoneNumber } = require('../services/whatsappService');
+const { sendReviewNotification, formatPhoneNumber } = require('../services/metaWhatsAppService');
 
 // Add a new review
 const addReview = async (req, res) => {

@@ -1,7 +1,7 @@
 const User = require("../models/userModel");
 const cloudinary = require("../cloudinaryConfig");
 const multer = require("multer");
-const { sendPhotoUploadConfirmation } = require('../services/whatsappService');
+const { sendPhotoUploadConfirmation } = require('../services/metaWhatsAppService');
 
 // Configure multer for memory storage
 const upload = multer({

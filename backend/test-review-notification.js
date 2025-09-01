@@ -1,27 +1,20 @@
 require('dotenv').config();
-const { sendReviewNotification } = require('./services/whatsappService');
+const { sendReviewNotification, validateMetaConfig } = require('./services/metaWhatsAppService');
 
 // Test phone number (replace with your WhatsApp number)
 const testPhoneNumber = process.env.TEST_PHONE_NUMBER || '8130026321'; // Removed +91 to test formatting
 
 async function testReviewNotification() {
-  console.log('Testing WhatsApp Review Notification functionality...\n');
+  console.log('Testing Meta API WhatsApp Review Notification functionality...\n');
 
   // Test 1: Check environment variables
   console.log('1. Checking environment variables...');
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-    console.log('✅ Twilio credentials found');
-  } else {
-    console.log('❌ Twilio credentials missing');
+  const configValid = validateMetaConfig();
+  if (!configValid) {
+    console.log('❌ Meta API configuration missing');
     return;
   }
-
-  if (process.env.TWILIO_WHATSAPP_NUMBER) {
-    console.log('✅ WhatsApp number configured:', process.env.TWILIO_WHATSAPP_NUMBER);
-  } else {
-    console.log('❌ WhatsApp number not configured');
-    return;
-  }
+  console.log('✅ Meta API configuration found');
 
   // Test 2: Test review notification with template
   console.log('\n2. Testing review notification with template...');
@@ -39,27 +32,26 @@ async function testReviewNotification() {
       // Send via WhatsApp template
       const response = await sendReviewNotification(testPhoneNumber, reviewData);
       console.log('✅ WhatsApp template message sent successfully');
-      console.log('Message SID:', response.sid);
+      console.log('Message ID:', response.messages?.[0]?.id || 'N/A');
     } else {
       console.log('✅ Development mode - Review notification logged to console');
       console.log(`Review notification for ${testPhoneNumber}:`);
       console.log(`Rating: ${reviewData.rating}/5`);
       console.log(`Comment: "${reviewData.comment}"`);
       console.log(`Reviewer: ${reviewData.reviewerName}`);
-      console.log('Template ID: HX17af3999106bed9bceb08252052e989b');
+      console.log('Template Name:', process.env.WHATSAPP_REVIEW_TEMPLATE_NAME || 'review_notification');
     }
 
   } catch (error) {
     console.error('❌ Error sending WhatsApp review notification:', error.message);
     
-    if (error.code === 21211) {
-      console.log('💡 Tip: Make sure you have joined the WhatsApp sandbox');
-      console.log('💡 Tip: Check if the phone number is registered with WhatsApp');
-    }
-    
-    if (error.code === 30008) {
-      console.log('💡 Tip: Check if the template ID is correct and approved');
-      console.log('💡 Tip: Make sure the template variables match the template');
+    if (error.message.includes('Invalid access token')) {
+      console.log('💡 Tip: Check your WHATSAPP_TOKEN in environment variables');
+    } else if (error.message.includes('Phone number ID')) {
+      console.log('💡 Tip: Check your WHATSAPP_PHONE_NUMBER_ID in environment variables');
+    } else if (error.message.includes('Template')) {
+      console.log('💡 Tip: Check if the template name is correct and approved');
+      console.log('💡 Tip: Make sure the template variables match the template structure');
     }
   }
 
@@ -78,7 +70,7 @@ async function testReviewNotification() {
     if (process.env.NODE_ENV === 'production') {
       const response = await sendReviewNotification(testPhoneNumber, reviewData2);
       console.log('✅ Second WhatsApp template message sent successfully');
-      console.log('Message SID:', response.sid);
+      console.log('Message ID:', response.messages?.[0]?.id || 'N/A');
     } else {
       console.log('✅ Development mode - Second review notification logged to console');
       console.log(`Second review notification for ${testPhoneNumber}:`);
@@ -92,11 +84,12 @@ async function testReviewNotification() {
   }
 
   console.log('\n📋 Next steps:');
-  console.log('1. Make sure you have joined the WhatsApp sandbox');
+  console.log('1. Make sure your Meta API templates are approved');
   console.log('2. Test with a real phone number');
-  console.log('3. Verify the template ID is correct and approved');
+  console.log('3. Verify the template name is correct and approved');
   console.log('4. Check that template variables match the template structure');
   console.log('5. Test the full review submission flow through the API');
+  console.log('6. Verify your business is approved by Meta');
 }
 
 // Run the test

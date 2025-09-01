@@ -1,19 +1,14 @@
 const VERIFY_TOKEN = "laarik";
 const VendorLocation = require('../models/vendorLocationModel');
 const User = require('../models/userModel');
-const twilio = require('twilio');
 const { 
+  sendText,
+  sendTemplate,
   sendPhotoUploadInvitation, 
   sendPhotoUploadConfirmation, 
   generateVendorUploadUrl,
   formatPhoneNumber 
-} = require('../services/whatsappService');
-
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+} = require('../services/metaWhatsAppService');
 
 const verifyWebhook = (req, res) => {
   const mode = req.query['hub.mode'];
@@ -48,13 +43,8 @@ Longitude: ${longitude}
 
 You can update your location anytime by sending a new location.`;
 
-    const response = await twilioClient.messages.create({
-      body: message,
-      from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-      to: `whatsapp:${to}`
-    });
-
-    console.log('Location confirmation sent successfully:', response.sid);
+    const response = await sendText(to, message);
+    console.log('Location confirmation sent successfully via Meta API');
     return response;
   } catch (error) {
     console.error('Error sending location confirmation:', error);
@@ -116,13 +106,9 @@ const handleButtonClick = async (message) => {
       // Send confirmation with upload link
       const confirmationMessage = `✅ Great! Click the link below to upload your photos:\n\n${uploadUrl}\n\nThis will take you directly to your vendor dashboard where you can upload your profile picture and business images.`;
       
-      await twilioClient.messages.create({
-        body: confirmationMessage,
-        from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-        to: `whatsapp:${from}`
-      });
+      await sendText(from, confirmationMessage);
       
-      console.log('Photo upload link sent to vendor:', from);
+      console.log('Photo upload link sent to vendor via Meta API:', from);
       return true;
     }
     
@@ -139,39 +125,51 @@ const handleWebhook = async (req, res) => {
   console.log('Received webhook:', JSON.stringify(body, null, 2));
 
   try {
-    // Handle Twilio webhook format
-    if (body.Body && body.From) {
-      const message = {
-        from: body.From.replace('whatsapp:', ''),
-        type: 'text',
-        text: { body: body.Body }
-      };
-
-      // Check if this is a location message (Twilio doesn't directly support location messages)
-      // You might need to handle this differently based on your requirements
-      console.log('Received message from Twilio:', message);
-      
-      // For now, just acknowledge the message
-      res.status(200).send('OK');
-      return;
-    }
-
-    // Handle Meta WhatsApp Business API format (if you switch to it later)
-    if (body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages) {
+    // Handle Meta WhatsApp Business API format
+    if (body.entry && body.entry[0]?.changes && body.entry[0].changes[0]?.value?.messages) {
       const messages = body.entry[0].changes[0].value.messages;
 
       // Process each message
       for (const message of messages) {
-        // Handle interactive button clicks
-        if (message.type === 'interactive' && message.interactive?.type === 'button_reply') {
-          await handleButtonClick(message);
+        console.log('Processing Meta message:', message);
+        
+        // Extract sender phone number (MSISDN digits only)
+        const sender = message.from;
+        
+        // Handle different message types
+        if (message.type === 'text') {
+          // Handle text messages: message.text.body
+          const textBody = message.text.body;
+          console.log('Received text message from', sender, ':', textBody);
+          
+          // Process text message as needed
+          // You can add custom text message handling logic here
+          
+        } else if (message.type === 'location') {
+          // Handle location messages: message.location.latitude, message.location.longitude
+          const locationMessage = {
+            from: sender,
+            location: {
+              latitude: message.location.latitude,
+              longitude: message.location.longitude
+            }
+          };
+          await handleLocationMessage(locationMessage);
+          
+        } else if (message.type === 'interactive' && message.interactive?.type === 'button_reply') {
+          // Handle interactive button clicks
+          const interactiveMessage = {
+            from: sender,
+            interactive: message.interactive
+          };
+          await handleButtonClick(interactiveMessage);
+          
+        } else {
+          console.log('Unhandled message type:', message.type);
         }
-        // Handle location messages
-        else if (message.type === 'location') {
-          await handleLocationMessage(message);
-        }
-        // Add other message type handlers here as needed
       }
+    } else {
+      console.log('Received non-message webhook or invalid format');
     }
 
     res.sendStatus(200);
