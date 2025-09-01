@@ -1,11 +1,5 @@
 const User = require("../models/userModel");
-const twilio = require('twilio');
-
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+const { sendText, sendTemplate } = require('../services/metaWhatsAppService');
 
 // Store OTP codes temporarily (in production, use Redis)
 const otpStore = new Map();
@@ -15,7 +9,7 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP via Twilio (WhatsApp or SMS)
+// Send OTP via Meta WhatsApp API
 const sendOTP = async (req, res) => {
   try {
     const { phoneNumber, method = 'whatsapp' } = req.body;
@@ -66,37 +60,22 @@ const sendOTP = async (req, res) => {
       expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
     });
 
-    // Send OTP via Twilio (WhatsApp or SMS)
+    // Send OTP via Meta WhatsApp API
     try {
-      const messageConfig = {
-        body: `Your LaariKhojo verification code is: ${otp}. Valid for 5 minutes.`,
-        to: actualPhoneNumber
-      };
+      const message = `Your LaariKhojo verification code is: ${otp}. Valid for 5 minutes.`;
 
-      if (method === 'whatsapp') {
-        // Send via WhatsApp
-        const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER?.replace('%', ''); // Remove any trailing % if present
-        messageConfig.from = `whatsapp:${whatsappNumber}`;
-        messageConfig.to = `whatsapp:${actualPhoneNumber}`;
-      } else {
-        // Send via SMS
-        messageConfig.from = process.env.TWILIO_PHONE_NUMBER;
-      }
+      console.log('Attempting to send OTP via Meta WhatsApp API to:', actualPhoneNumber);
 
-      console.log('Attempting to send message with config:', {
-        ...messageConfig,
-        body: messageConfig.body.substring(0, 20) + '...' // Log partial body for security
-      });
-
-      const result = await twilioClient.messages.create(messageConfig);
-      console.log('Twilio message sent successfully:', result.sid);
+      // Use Meta WhatsApp API to send text message
+      const result = await sendText(actualPhoneNumber, message);
+      console.log('Meta WhatsApp OTP sent successfully');
       
-    } catch (twilioError) {
-      console.error('Twilio error:', twilioError);
+    } catch (metaError) {
+      console.error('Meta WhatsApp API error:', metaError);
       
       // In development, still return success but log the OTP for testing
       if (process.env.NODE_ENV === 'development') {
-        console.log(`Development OTP for ${actualPhoneNumber} (${method}): ${otp}`);
+        console.log(`Development OTP for ${actualPhoneNumber}: ${otp}`);
       } else {
         return res.status(500).json({
           success: false,
@@ -107,10 +86,10 @@ const sendOTP = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      msg: `OTP sent successfully via ${method}`,
+      msg: `OTP sent successfully via WhatsApp`,
       data: {
         phoneNumber: actualPhoneNumber,
-        method,
+        method: 'whatsapp',
         // In development, include OTP for testing
         ...(process.env.NODE_ENV !== 'production' && { otp })
       }

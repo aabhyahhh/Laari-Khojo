@@ -2,7 +2,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Review = require('./models/reviewModel');
 const User = require('./models/userModel');
-const { sendReviewNotification } = require('./services/whatsappService');
+const { sendReviewNotification } = require('./services/metaWhatsAppService');
 
 // Connect to MongoDB
 const MONGO_URI = process.env.MONGO_URI;

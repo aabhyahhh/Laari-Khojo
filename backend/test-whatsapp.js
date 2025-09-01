@@ -1,33 +1,20 @@
 require('dotenv').config();
-const twilio = require('twilio');
-
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+const { sendText, sendTemplate, validateMetaConfig } = require('./services/metaWhatsAppService');
 
 // Test phone number (replace with your WhatsApp number)
-const testPhoneNumber = process.env.TEST_PHONE_NUMBER || '+1234567890';
+const testPhoneNumber = process.env.TEST_PHONE_NUMBER || '+919876543210';
 
 async function testWhatsAppOTP() {
-  console.log('Testing WhatsApp OTP functionality...\n');
+  console.log('Testing Meta API WhatsApp functionality...\n');
 
   // Test 1: Check environment variables
   console.log('1. Checking environment variables...');
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-    console.log('✅ Twilio credentials found');
-  } else {
-    console.log('❌ Twilio credentials missing');
+  const configValid = validateMetaConfig();
+  if (!configValid) {
+    console.log('❌ Meta API configuration missing');
     return;
   }
-
-  if (process.env.TWILIO_WHATSAPP_NUMBER) {
-    console.log('✅ WhatsApp number configured:', process.env.TWILIO_WHATSAPP_NUMBER);
-  } else {
-    console.log('❌ WhatsApp number not configured');
-    return;
-  }
+  console.log('✅ Meta API configuration found');
 
   // Test 2: Generate and send test OTP
   console.log('\n2. Testing OTP generation and sending...');
@@ -37,15 +24,11 @@ async function testWhatsAppOTP() {
     console.log('Generated OTP:', otp);
 
     if (process.env.NODE_ENV === 'production') {
-      // Send via WhatsApp
-      const message = await twilioClient.messages.create({
-        body: `Test OTP from LaariKhojo: ${otp}. This is a test message.`,
-        from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-        to: `whatsapp:${testPhoneNumber}`
-      });
+      // Send via WhatsApp using Meta API
+      const message = await sendText(testPhoneNumber, `Test OTP from LaariKhojo: ${otp}. This is a test message.`);
       
       console.log('✅ WhatsApp message sent successfully');
-      console.log('Message SID:', message.sid);
+      console.log('Message ID:', message.messages?.[0]?.id || 'N/A');
     } else {
       console.log('✅ Development mode - OTP logged to console');
       console.log(`OTP for ${testPhoneNumber}: ${otp}`);
@@ -54,9 +37,10 @@ async function testWhatsAppOTP() {
   } catch (error) {
     console.error('❌ Error sending WhatsApp message:', error.message);
     
-    if (error.code === 21211) {
-      console.log('💡 Tip: Make sure you have joined the WhatsApp sandbox');
-      console.log('💡 Tip: Check if the phone number is registered with WhatsApp');
+    if (error.message.includes('Invalid access token')) {
+      console.log('💡 Tip: Check your WHATSAPP_TOKEN in environment variables');
+    } else if (error.message.includes('Phone number ID')) {
+      console.log('💡 Tip: Check your WHATSAPP_PHONE_NUMBER_ID in environment variables');
     }
   }
 
@@ -88,9 +72,10 @@ async function testWhatsAppOTP() {
   }
 
   console.log('\n📋 Next steps:');
-  console.log('1. Make sure you have joined the WhatsApp sandbox');
+  console.log('1. Make sure your Meta API templates are approved');
   console.log('2. Test with a real phone number');
   console.log('3. Check the frontend integration');
+  console.log('4. Verify your business is approved by Meta');
 }
 
 // Run the test

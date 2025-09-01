@@ -1,11 +1,5 @@
 require('dotenv').config();
-const twilio = require('twilio');
-
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+const { sendText } = require('./services/metaWhatsAppService');
 
 async function sendBulkTestVendors() {
   console.log('📤 Sending WhatsApp Messages to Test Vendor List\n');
@@ -64,14 +58,10 @@ ${uploadUrl}
 
 This will take you directly to your vendor dashboard where you can upload your profile picture and business images.`;
       
-      // Send the message
-      const result = await twilioClient.messages.create({
-        body: message,
-        from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-        to: `whatsapp:${phoneNumber}`
-      });
+      // Send the message via Meta WhatsApp API
+      const result = await sendText(phoneNumber, message);
       
-      console.log(`✅ Sent to ${vendor.name} (${result.sid})`);
+      console.log(`✅ Sent to ${vendor.name} via Meta API`);
       successCount++;
       
       // Add delay between messages to avoid rate limiting
