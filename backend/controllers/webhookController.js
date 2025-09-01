@@ -1,4 +1,4 @@
-const VERIFY_TOKEN = "laarik";
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN || '';
 const VendorLocation = require('../models/vendorLocationModel');
 const User = require('../models/userModel');
 const { 
@@ -11,27 +11,31 @@ const {
 } = require('../services/metaWhatsAppService');
 
 const verifyWebhook = (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
+  try {
+    const mode = req.query['hub.mode'];
+    const token = String(req.query['hub.verify_token'] || '');
+    const challenge = String(req.query['hub.challenge'] || '');
 
-  console.log('Webhook verification attempt:', {
-    mode,
-    token,
-    challenge,
-    expectedToken: VERIFY_TOKEN,
-    query: req.query
-  });
+    const modeOk = mode === 'subscribe';
+    const tokenOk = token === VERIFY_TOKEN;
 
-  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-    console.log('WEBHOOK_VERIFIED');
-    res.status(200).send(challenge);
-  } else {
-    console.log('Webhook verification failed:', {
-      modeMatch: mode === 'subscribe',
-      tokenMatch: token === VERIFY_TOKEN
+    // Minimal logging without leaking secrets
+    console.log('Webhook verification attempt', {
+      modeOk,
+      tokenProvided: Boolean(token),
+      hasServerToken: Boolean(VERIFY_TOKEN)
     });
-    res.sendStatus(403);
+
+    if (modeOk && tokenOk) {
+      console.log('WEBHOOK_VERIFIED');
+      return res.status(200).send(challenge); // plain text, no JSON
+    }
+
+    console.warn('Webhook verification failed', { modeOk, tokenOk });
+    return res.sendStatus(403);
+  } catch (err) {
+    console.error('verifyWebhook error:', err);
+    return res.sendStatus(403);
   }
 };
 
