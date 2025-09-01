@@ -173,4 +173,84 @@ app.get("/", (req, res) => {
   res.status(200).send("Backend is live");
 });
 
+// --- Meta WhatsApp test endpoints (safe to remove later) ---
+
+// Send a free-form text (works only if the user wrote to you in the last 24h)
+app.get("/api/test/send-text", async (req, res) => {
+  try {
+    const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || "v21.0";
+    const TOKEN = process.env.WHATSAPP_TOKEN;
+    const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    if (!TOKEN || !PHONE_NUMBER_ID) {
+      return res.status(500).json({ error: "Missing WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID" });
+    }
+
+    const toRaw = String(req.query.to || "");
+    const to = withCC(digitsOnly(toRaw)); // ensure digits + country code (e.g., 91xxxxxxxxxx)
+    const body = String(req.query.body || "Hello from Laari Khojo!");
+
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${PHONE_NUMBER_ID}/messages`;
+    const payload = {
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body }
+    };
+
+    const r = await axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    return res.json(r.data);
+  } catch (err) {
+    // Common cause: outside 24h window -> need a template instead
+    const data = err.response?.data || { message: err.message };
+    return res.status(err.response?.status || 500).json({ error: "Send text failed", details: data });
+  }
+});
+
+// Send a template (works inside/outside 24h, as long as it's approved)
+app.get("/api/test/send-template", async (req, res) => {
+  try {
+    const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || "v21.0";
+    const TOKEN = process.env.WHATSAPP_TOKEN;
+    const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    if (!TOKEN || !PHONE_NUMBER_ID) {
+      return res.status(500).json({ error: "Missing WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID" });
+    }
+
+    const toRaw = String(req.query.to || "");
+    const templateName = String(req.query.name || "your_template_name");
+    const to = withCC(digitsOnly(toRaw));
+
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${PHONE_NUMBER_ID}/messages`;
+    const payload = {
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: "en" }
+        // add components here if your template expects variables
+        // components: [{ type: "body", parameters: [{ type: "text", text: "Riya" }] }]
+      }
+    };
+
+    const r = await axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    return res.json(r.data);
+  } catch (err) {
+    const data = err.response?.data || { message: err.message };
+    return res.status(err.response?.status || 500).json({ error: "Send template failed", details: data });
+  }
+});
+
 module.exports = app;
