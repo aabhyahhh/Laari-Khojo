@@ -1,4 +1,4 @@
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN || '';
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || process.env.VERIFY_TOKEN || '';
 const VendorLocation = require('../models/vendorLocationModel');
 const User = require('../models/userModel');
 const { 
@@ -56,6 +56,38 @@ You can update your location anytime by sending a new location.`;
   }
 };
 
+const extractCoordinatesFromMapsUrl = (text) => {
+  try {
+    // Handle various Google Maps URL formats
+    const patterns = [
+      // @lat,lng format
+      /@([-+]?\d*\.\d+),([-+]?\d*\.\d+)/,
+      // ?q=lat,lng format
+      /[?&]q=([-+]?\d*\.\d+),([-+]?\d*\.\d+)/,
+      // /place/...@lat,lng format
+      /\/place\/[^@]+@([-+]?\d*\.\d+),([-+]?\d*\.\d+)/
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const latitude = parseFloat(match[1]);
+        const longitude = parseFloat(match[2]);
+        
+        // Validate coordinates
+        if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
+          return { latitude, longitude };
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error extracting coordinates from Maps URL:', error);
+    return null;
+  }
+};
+
 const handleLocationMessage = async (message) => {
   try {
     const { from, location } = message;
@@ -70,7 +102,7 @@ const handleLocationMessage = async (message) => {
           lat: latitude,
           lng: longitude
         },
-        updatedAt: new Date()
+        lastMessageTs: new Date()
       },
       { upsert: true, new: true }
     );
@@ -82,6 +114,66 @@ const handleLocationMessage = async (message) => {
     return true;
   } catch (error) {
     console.error('Error handling location message:', error);
+    return false;
+  }
+};
+
+const handleTextMessage = async (message) => {
+  try {
+    const { from, text, id, timestamp } = message;
+    const textBody = text?.body || '';
+
+    console.log('Processing text message from', from, ':', textBody);
+
+    // Check if it's a Google Maps URL
+    const coordinates = extractCoordinatesFromMapsUrl(textBody);
+    
+    if (coordinates) {
+      console.log('Extracted coordinates from Maps URL:', coordinates);
+      
+      // Update vendor location with extracted coordinates
+      await VendorLocation.findOneAndUpdate(
+        { phone: from },
+        {
+          phone: from,
+          location: {
+            lat: coordinates.latitude,
+            lng: coordinates.longitude
+          },
+          lastMessageId: id,
+          lastMessageTs: new Date(timestamp * 1000)
+        },
+        { upsert: true, new: true }
+      );
+
+      // Send confirmation
+      await sendText(from, `✅ Location updated from your Maps link!
+Latitude: ${coordinates.latitude}
+Longitude: ${coordinates.longitude}
+
+Thank you for sharing your location!`);
+      
+      return true;
+    }
+
+    // Handle other text messages as needed
+    if (textBody.toLowerCase().includes('help') || textBody.toLowerCase().includes('menu')) {
+      const helpMessage = `🤖 Welcome to Laari Khojo!
+
+Here's what you can do:
+📍 Send your location to update your business coordinates
+🔗 Share a Google Maps link with your location
+📤 Upload photos of your business
+
+Need help? Just send "help" anytime!`;
+      
+      await sendText(from, helpMessage);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Error handling text message:', error);
     return false;
   }
 };
@@ -142,15 +234,9 @@ const handleWebhook = async (req, res) => {
         
         // Handle different message types
         if (message.type === 'text') {
-          // Handle text messages: message.text.body
-          const textBody = message.text.body;
-          console.log('Received text message from', sender, ':', textBody);
-          
-          // Process text message as needed
-          // You can add custom text message handling logic here
+          await handleTextMessage(message);
           
         } else if (message.type === 'location') {
-          // Handle location messages: message.location.latitude, message.location.longitude
           const locationMessage = {
             from: sender,
             location: {
@@ -161,7 +247,6 @@ const handleWebhook = async (req, res) => {
           await handleLocationMessage(locationMessage);
           
         } else if (message.type === 'interactive' && message.interactive?.type === 'button_reply') {
-          // Handle interactive button clicks
           const interactiveMessage = {
             from: sender,
             interactive: message.interactive

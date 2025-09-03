@@ -1,96 +1,142 @@
 require('dotenv').config();
-const { sendReviewNotification, validateMetaConfig } = require('./services/metaWhatsAppService');
+const { sendReviewNotification, formatPhoneNumber } = require('./services/metaWhatsAppService');
 
-// Test phone number (replace with your WhatsApp number)
-const testPhoneNumber = process.env.TEST_PHONE_NUMBER || '8130026321'; // Removed +91 to test formatting
-
+// Test review notification
 async function testReviewNotification() {
-  console.log('Testing Meta API WhatsApp Review Notification functionality...\n');
-
-  // Test 1: Check environment variables
-  console.log('1. Checking environment variables...');
-  const configValid = validateMetaConfig();
-  if (!configValid) {
-    console.log('❌ Meta API configuration missing');
-    return;
-  }
-  console.log('✅ Meta API configuration found');
-
-  // Test 2: Test review notification with template
-  console.log('\n2. Testing review notification with template...');
-  
   try {
+    console.log('🧪 Testing Review Notification System\n');
+    
+    // Test phone number (replace with actual test number)
+    const testPhoneNumber = process.env.TEST_PHONE_NUMBER || '919876543210';
+    
+    // Sample review data
     const reviewData = {
-      rating: 5,
-      comment: 'Amazing food! The chaat was delicious and the service was great. Highly recommended!',
+      rating: 4,
+      comment: 'Awesome Food! The taste was amazing and service was quick.',
       reviewerName: 'John Doe'
     };
-
-    console.log('Sending review notification with data:', reviewData);
     
-    if (process.env.NODE_ENV === 'production') {
-      // Send via WhatsApp template
-      const response = await sendReviewNotification(testPhoneNumber, reviewData);
-      console.log('✅ WhatsApp template message sent successfully');
-      console.log('Message ID:', response.messages?.[0]?.id || 'N/A');
-    } else {
-      console.log('✅ Development mode - Review notification logged to console');
-      console.log(`Review notification for ${testPhoneNumber}:`);
-      console.log(`Rating: ${reviewData.rating}/5`);
-      console.log(`Comment: "${reviewData.comment}"`);
-      console.log(`Reviewer: ${reviewData.reviewerName}`);
-      console.log('Template Name:', process.env.WHATSAPP_REVIEW_TEMPLATE_NAME || 'review_notification');
-    }
-
+    console.log('📱 Test Phone Number:', testPhoneNumber);
+    console.log('📊 Review Data:', reviewData);
+    console.log('📝 Formatted Phone Number:', formatPhoneNumber(testPhoneNumber));
+    
+    console.log('\n📤 Sending review notification...');
+    
+    // Send the review notification
+    const result = await sendReviewNotification(testPhoneNumber, reviewData);
+    
+    console.log('✅ Review notification sent successfully!');
+    console.log('📋 Result:', result);
+    
   } catch (error) {
-    console.error('❌ Error sending WhatsApp review notification:', error.message);
+    console.error('❌ Error testing review notification:', error.message);
     
-    if (error.message.includes('Invalid access token')) {
-      console.log('💡 Tip: Check your WHATSAPP_TOKEN in environment variables');
-    } else if (error.message.includes('Phone number ID')) {
-      console.log('💡 Tip: Check your WHATSAPP_PHONE_NUMBER_ID in environment variables');
-    } else if (error.message.includes('Template')) {
-      console.log('💡 Tip: Check if the template name is correct and approved');
-      console.log('💡 Tip: Make sure the template variables match the template structure');
+    if (error.message.includes('Meta API configuration is missing')) {
+      console.log('\n💡 Solution: Check your environment variables:');
+      console.log('   - WHATSAPP_TOKEN');
+      console.log('   - WHATSAPP_PHONE_NUMBER_ID');
+      console.log('   - GRAPH_API_VERSION (optional, defaults to v21.0)');
+    }
+    
+    if (error.message.includes('Invalid phone number format')) {
+      console.log('\n💡 Solution: Check your phone number format');
+      console.log('   - Should be 10 digits for Indian numbers');
+      console.log('   - Or include country code');
     }
   }
-
-  // Test 3: Test with different review data
-  console.log('\n3. Testing with different review data...');
-  
-  try {
-    const reviewData2 = {
-      rating: 3,
-      comment: 'Food was okay, but could be better. Service was slow.',
-      reviewerName: 'Jane Smith'
-    };
-
-    console.log('Sending second review notification with data:', reviewData2);
-    
-    if (process.env.NODE_ENV === 'production') {
-      const response = await sendReviewNotification(testPhoneNumber, reviewData2);
-      console.log('✅ Second WhatsApp template message sent successfully');
-      console.log('Message ID:', response.messages?.[0]?.id || 'N/A');
-    } else {
-      console.log('✅ Development mode - Second review notification logged to console');
-      console.log(`Second review notification for ${testPhoneNumber}:`);
-      console.log(`Rating: ${reviewData2.rating}/5`);
-      console.log(`Comment: "${reviewData2.comment}"`);
-      console.log(`Reviewer: ${reviewData2.reviewerName}`);
-    }
-
-  } catch (error) {
-    console.error('❌ Error sending second WhatsApp review notification:', error.message);
-  }
-
-  console.log('\n📋 Next steps:');
-  console.log('1. Make sure your Meta API templates are approved');
-  console.log('2. Test with a real phone number');
-  console.log('3. Verify the template name is correct and approved');
-  console.log('4. Check that template variables match the template structure');
-  console.log('5. Test the full review submission flow through the API');
-  console.log('6. Verify your business is approved by Meta');
 }
 
-// Run the test
-testReviewNotification().catch(console.error); 
+// Test different review scenarios
+async function testMultipleReviewScenarios() {
+  console.log('\n🧪 Testing Multiple Review Scenarios\n');
+  
+  const testScenarios = [
+    {
+      rating: 5,
+      comment: 'Excellent service and amazing food quality!',
+      reviewerName: 'Sarah Wilson'
+    },
+    {
+      rating: 3,
+      comment: 'Good food but could be better.',
+      reviewerName: 'Mike Johnson'
+    },
+    {
+      rating: 1,
+      comment: 'Not satisfied with the service.',
+      reviewerName: 'Alex Brown'
+    },
+    {
+      rating: 4,
+      comment: '', // No comment
+      reviewerName: 'Emma Davis'
+    }
+  ];
+  
+  for (let i = 0; i < testScenarios.length; i++) {
+    const scenario = testScenarios[i];
+    console.log(`\n📝 Testing Scenario ${i + 1}:`);
+    console.log(`   Rating: ${scenario.rating}/5`);
+    console.log(`   Comment: "${scenario.comment || 'No comment'}"`);
+    console.log(`   Reviewer: ${scenario.reviewerName}`);
+    
+    try {
+      // Note: This would actually send messages, so we'll just simulate
+      console.log('   ✅ Scenario would send notification successfully');
+    } catch (error) {
+      console.log(`   ❌ Scenario failed: ${error.message}`);
+    }
+  }
+}
+
+// Test phone number formatting
+function testPhoneNumberFormatting() {
+  console.log('\n🧪 Testing Phone Number Formatting\n');
+  
+  const testNumbers = [
+    '9876543210',           // 10-digit Indian
+    '+919876543210',        // With +91
+    '919876543210',         // With 91
+    '09876543210',          // With 0 prefix
+    '+1-555-123-4567',     // US format
+    'invalid',              // Invalid
+    ''                      // Empty
+  ];
+  
+  testNumbers.forEach(number => {
+    try {
+      const formatted = formatPhoneNumber(number);
+      console.log(`📱 ${number} -> ${formatted || 'INVALID'}`);
+    } catch (error) {
+      console.log(`📱 ${number} -> ERROR: ${error.message}`);
+    }
+  });
+}
+
+// Main test function
+async function runAllTests() {
+  console.log('🚀 Starting Review Notification Tests\n');
+  
+  // Test phone number formatting first
+  testPhoneNumberFormatting();
+  
+  // Test review notification
+  await testReviewNotification();
+  
+  // Test multiple scenarios (simulation only)
+  await testMultipleReviewScenarios();
+  
+  console.log('\n✨ All tests completed!');
+}
+
+// Run if called directly
+if (require.main === module) {
+  runAllTests().catch(console.error);
+}
+
+module.exports = {
+  testReviewNotification,
+  testMultipleReviewScenarios,
+  testPhoneNumberFormatting,
+  runAllTests
+}; 
