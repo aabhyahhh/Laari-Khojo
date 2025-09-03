@@ -1,5 +1,5 @@
 const User = require("../models/userModel");
-const { sendText, sendTemplate } = require('../services/metaWhatsAppService');
+const { sendOTPMessage, sendOTPTemplate, formatPhoneNumber } = require('../services/metaWhatsAppService');
 
 // Store OTP codes temporarily (in production, use Redis)
 const otpStore = new Map();
@@ -12,7 +12,7 @@ const generateOTP = () => {
 // Send OTP via Meta WhatsApp API
 const sendOTP = async (req, res) => {
   try {
-    const { phoneNumber, method = 'whatsapp' } = req.body;
+    const { phoneNumber, method = 'whatsapp', useTemplate = false } = req.body;
 
     if (!phoneNumber) {
       return res.status(400).json({
@@ -62,20 +62,31 @@ const sendOTP = async (req, res) => {
 
     // Send OTP via Meta WhatsApp API
     try {
-      const message = `Your LaariKhojo verification code is: ${otp}. Valid for 5 minutes.`;
+      console.log('📤 Attempting to send OTP via Meta WhatsApp API to:', actualPhoneNumber);
+      console.log('🔐 Generated OTP:', otp);
+      console.log('📝 Use Template:', useTemplate);
 
-      console.log('Attempting to send OTP via Meta WhatsApp API to:', actualPhoneNumber);
-
-      // Use Meta WhatsApp API to send text message
-      const result = await sendText(actualPhoneNumber, message);
-      console.log('Meta WhatsApp OTP sent successfully');
+      let result;
+      
+      if (useTemplate && process.env.WHATSAPP_OTP_TEMPLATE_NAME) {
+        // Try to use template first
+        result = await sendOTPTemplate(actualPhoneNumber, otp);
+        console.log('✅ OTP sent successfully via template');
+      } else {
+        // Use text message
+        result = await sendOTPMessage(actualPhoneNumber, otp);
+        console.log('✅ OTP sent successfully via text message');
+      }
+      
+      console.log('📋 WhatsApp API Response:', result);
       
     } catch (metaError) {
-      console.error('Meta WhatsApp API error:', metaError);
+      console.error('❌ Meta WhatsApp API error:', metaError);
       
       // In development, still return success but log the OTP for testing
       if (process.env.NODE_ENV === 'development') {
-        console.log(`Development OTP for ${actualPhoneNumber}: ${otp}`);
+        console.log(`🔐 Development OTP for ${actualPhoneNumber}: ${otp}`);
+        console.log('💡 In production, this would fail the request');
       } else {
         return res.status(500).json({
           success: false,
@@ -90,13 +101,14 @@ const sendOTP = async (req, res) => {
       data: {
         phoneNumber: actualPhoneNumber,
         method: 'whatsapp',
+        useTemplate: useTemplate && !!process.env.WHATSAPP_OTP_TEMPLATE_NAME,
         // In development, include OTP for testing
         ...(process.env.NODE_ENV !== 'production' && { otp })
       }
     });
 
   } catch (error) {
-    console.error('Send OTP error:', error);
+    console.error('❌ Send OTP error:', error);
     return res.status(500).json({
       success: false,
       msg: "Error sending OTP",
