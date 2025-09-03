@@ -151,31 +151,39 @@ const sendReviewNotification = async (vendorPhoneNumber, reviewData) => {
     const templateName = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME;
     
     if (templateName) {
-      // Use template with variables if available
-      console.log('📝 Using template:', templateName);
-      const components = [
-        {
-          type: "body",
-          parameters: [
-            {
-              type: "text",
-              text: reviewData.rating.toString()
-            },
-            {
-              type: "text", 
-              text: reviewData.comment || 'No comment provided'
-            },
-            {
-              type: "text",
-              text: reviewData.reviewerName
-            }
-          ]
-        }
-      ];
+      // Try to use template with variables if available
+      console.log('📝 Attempting to use template:', templateName);
+      try {
+        const components = [
+          {
+            type: "body",
+            parameters: [
+              {
+                type: "text",
+                text: reviewData.rating.toString()
+              },
+              {
+                type: "text", 
+                text: reviewData.comment || 'No comment provided'
+              },
+              {
+                type: "text",
+                text: reviewData.reviewerName
+              }
+            ]
+          }
+        ];
 
-      return await sendTemplate(formattedNumber, templateName, "en", components);
+        const result = await sendTemplate(formattedNumber, templateName, "en", components);
+        console.log('✅ Template message sent successfully');
+        return result;
+      } catch (templateError) {
+        console.log('⚠️ Template failed, falling back to text message:', templateError.message);
+        // Fallback to text message if template fails
+        return await sendReviewNotificationText(formattedNumber, reviewData);
+      }
     } else {
-      // Fallback to text message if no template is configured
+      // No template configured, send text message directly
       console.log('📝 No template configured, sending text message');
       return await sendReviewNotificationText(formattedNumber, reviewData);
     }

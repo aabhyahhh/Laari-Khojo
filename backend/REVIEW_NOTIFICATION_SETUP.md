@@ -68,7 +68,7 @@ WHATSAPP_REVIEW_TEMPLATE_NAME=review_notification
 4. Create a new template with the name `review_notification`
 5. Use this template structure:
 
-**Template Name**: `review_notification`
+**Template Name**: `new_review_rating_notif_to_vendor`
 **Language**: English
 **Category**: Customer Care
 **Template Content**:
