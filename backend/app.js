@@ -65,6 +65,17 @@ app.use(
   })
 );
 
+// Ensure raw body is available for webhook signature verification
+app.use((req, res, next) => {
+  if (req.rawBody) {
+    next();
+  } else {
+    // For routes that need raw body but don't have it
+    req.rawBody = Buffer.from(JSON.stringify(req.body || {}));
+    next();
+  }
+});
+
 // MongoDB Connection
 mongoose
   .connect(MONGO_URI)

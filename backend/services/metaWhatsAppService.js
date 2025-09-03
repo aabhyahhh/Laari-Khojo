@@ -147,31 +147,77 @@ const sendReviewNotification = async (vendorPhoneNumber, reviewData) => {
     const formattedNumber = formatPhoneNumber(vendorPhoneNumber);
     console.log('📱 Formatted phone number:', formattedNumber);
     
-    // Use template with variables
-    const templateName = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME || 'review_notification';
-    const components = [
-      {
-        type: "body",
-        parameters: [
+    // Check if we have a template name configured
+    const templateName = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME;
+    
+    if (templateName) {
+      // Try to use template with variables if available
+      console.log('📝 Attempting to use template:', templateName);
+      try {
+        const components = [
           {
-            type: "text",
-            text: reviewData.rating.toString()
-          },
-          {
-            type: "text", 
-            text: reviewData.comment || 'No comment provided'
-          },
-          {
-            type: "text",
-            text: reviewData.reviewerName
+            type: "body",
+            parameters: [
+              {
+                type: "text",
+                text: reviewData.rating.toString()
+              },
+              {
+                type: "text", 
+                text: reviewData.comment || 'No comment provided'
+              },
+              {
+                type: "text",
+                text: reviewData.reviewerName
+              }
+            ]
           }
-        ]
-      }
-    ];
+        ];
 
-    return await sendTemplate(formattedNumber, templateName, "en", components);
+        const result = await sendTemplate(formattedNumber, templateName, "en", components);
+        console.log('✅ Template message sent successfully');
+        return result;
+      } catch (templateError) {
+        console.log('⚠️ Template failed, falling back to text message:', templateError.message);
+        // Fallback to text message if template fails
+        return await sendReviewNotificationText(formattedNumber, reviewData);
+      }
+    } else {
+      // No template configured, send text message directly
+      console.log('📝 No template configured, sending text message');
+      return await sendReviewNotificationText(formattedNumber, reviewData);
+    }
   } catch (error) {
     console.error('❌ Error sending review notification:', error.message);
+    throw error;
+  }
+};
+
+// Send review notification as text message (fallback method)
+const sendReviewNotificationText = async (formattedNumber, reviewData) => {
+  try {
+    const message = `Hello 👋, you've received a new review on your Laari Khojo profile!
+नमस्ते 👋, आपकी लारी खोजो प्रोफ़ाइल पर एक नया रिव्यू आया है!
+
+⭐ Rating: ${reviewData.rating}/5
+
+🗣️ Comment: "${reviewData.comment || 'No comment provided'}"
+
+👤 Reviewer: ${reviewData.reviewerName}
+
+To view and respond to your reviews, visit your profile on Laari Khojo.
+अपने रिव्यू देखने और जवाब देने के लिए, अपनी लारी खोजो प्रोफ़ाइल पर जाएं।
+
+Thank you for being part of our community!
+हमारे समुदाय का हिस्सा बनने के लिए धन्यवाद!
+
+– Team Laari Khojo
+– टीम लारी खोजो`;
+
+    console.log('📤 Sending review notification text message to:', formattedNumber);
+    return await sendText(formattedNumber, message);
+  } catch (error) {
+    console.error('❌ Error sending review notification text message:', error.message);
     throw error;
   }
 };
@@ -279,6 +325,7 @@ module.exports = {
   sendText,
   sendTemplate,
   sendReviewNotification,
+  sendReviewNotificationText,
   sendLocationConfirmation,
   sendWhatsAppInteractiveMessage,
   sendPhotoUploadInvitation,

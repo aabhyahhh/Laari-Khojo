@@ -23,27 +23,41 @@ const withCountryCode = (msisdn) => {
 function verifyMetaSignature(req, res, next) {
   try {
     const appSecret = process.env.APP_SECRET;
-    if (!appSecret) return res.status(500).send('APP_SECRET not set');
+    if (!appSecret) {
+      console.error('APP_SECRET not set in environment');
+      return res.status(500).send('APP_SECRET not configured');
+    }
 
-    const signature = req.get('x-hub-signature-256') || '';
-    const expected =
-      'sha256=' +
-      crypto
-        .createHmac('sha256', appSecret)
-        .update(req.rawBody || JSON.stringify(req.body))
-        .digest('hex');
-
-    // timing-safe compare; mismatches = 403
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    const signature = req.get('x-hub-signature-256');
+    if (!signature) {
+      console.warn('Missing X-Hub-Signature-256 header');
       return res.sendStatus(403);
     }
+
+    // Use rawBody for signature verification
+    const rawBody = req.rawBody || Buffer.from(JSON.stringify(req.body));
+    const expected = 'sha256=' + crypto
+      .createHmac('sha256', appSecret)
+      .update(rawBody)
+      .digest('hex');
+
+    // Timing-safe comparison to prevent timing attacks
+    if (!crypto.timingSafeEqual(
+      Buffer.from(signature), 
+      Buffer.from(expected)
+    )) {
+      console.warn('Invalid webhook signature');
+      return res.sendStatus(403);
+    }
+
     return next();
-  } catch (e) {
+  } catch (error) {
+    console.error('Signature verification error:', error);
     return res.sendStatus(403);
   }
 }
 
-/** GET: webhook verification (uses your VERIFY_TOKEN) */
+/** GET: webhook verification challenge (Meta's verification) */
 router.get('/webhook', verifyWebhook);
 
 /** POST: webhook receiver (signature-verified) */
