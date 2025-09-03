@@ -315,6 +315,71 @@ const sendWhatsAppInteractiveMessage = async (to, message, buttons) => {
   }
 };
 
+// Send OTP verification message
+const sendOTPMessage = async (to, otp) => {
+  try {
+    const formattedNumber = formatPhoneNumber(to);
+    if (!formattedNumber) {
+      throw new Error('Invalid phone number format');
+    }
+    
+    const message = `Your LaariKhojo verification code is: ${otp}. Valid for 5 minutes.`;
+    
+    console.log('📤 Sending OTP message to:', formattedNumber);
+    console.log('🔐 OTP:', otp);
+    
+    return await sendText(formattedNumber, message);
+  } catch (error) {
+    console.error('❌ Error sending OTP message:', error.message);
+    throw error;
+  }
+};
+
+// Send OTP verification message using template (if available)
+const sendOTPTemplate = async (to, otp) => {
+  try {
+    const formattedNumber = formatPhoneNumber(to);
+    if (!formattedNumber) {
+      throw new Error('Invalid phone number format');
+    }
+    
+    const templateName = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+    
+    if (templateName) {
+      // Try to use template with variables if available
+      console.log('📝 Attempting to use OTP template:', templateName);
+      try {
+        const components = [
+          {
+            type: "body",
+            parameters: [
+              {
+                type: "text",
+                text: otp
+              }
+            ]
+          }
+        ];
+
+        const result = await sendTemplate(formattedNumber, templateName, "en", components);
+        console.log('✅ OTP template message sent successfully');
+        return result;
+      } catch (templateError) {
+        console.log('⚠️ OTP template failed, falling back to text message:', templateError.message);
+        // Fallback to text message if template fails
+        return await sendText(formattedNumber, `Your LaariKhojo verification code is: ${otp}. Valid for 5 minutes.`);
+      }
+    } else {
+      // No template configured, send text message directly
+      console.log('📝 No OTP template configured, sending text message');
+      return await sendText(formattedNumber, `Your LaariKhojo verification code is: ${otp}. Valid for 5 minutes.`);
+    }
+  } catch (error) {
+    console.error('❌ Error sending OTP template message:', error.message);
+    throw error;
+  }
+};
+
 // Legacy function names for backward compatibility
 const sendWhatsAppMessage = sendText;
 const sendWhatsAppTemplateMessage = sendTemplate;
@@ -332,6 +397,8 @@ module.exports = {
   sendPhotoUploadConfirmation,
   generateVendorUploadUrl,
   formatPhoneNumber,
-  validateMetaConfig
+  validateMetaConfig,
+  sendOTPMessage,
+  sendOTPTemplate
 };
 
