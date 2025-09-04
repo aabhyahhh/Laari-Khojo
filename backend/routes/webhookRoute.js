@@ -3,12 +3,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 
-const { verifyWebhook, handleWebhook } = require('../controllers/webhookController'); 
-// ^ update these controller functions to parse Meta payloads (entry -> changes -> value -> messages)
-
 const { sendPhotoUploadInvitation } = require('../services/metaWhatsAppService'); 
-// ^ implement this to call Meta Cloud API (not Twilio)
-
 const User = require('../models/userModel');
 
 /** Helpers */
@@ -19,49 +14,76 @@ const withCountryCode = (msisdn) => {
   return msisdn;
 };
 
-/** Middleware: verify Meta's POST signature using your APP_SECRET */
-function verifyMetaSignature(req, res, next) {
-  try {
-    const appSecret = process.env.APP_SECRET;
-    if (!appSecret) {
-      console.error('APP_SECRET not set in environment');
-      return res.status(500).send('APP_SECRET not configured');
-    }
-
-    const signature = req.get('x-hub-signature-256');
-    if (!signature) {
-      console.warn('Missing X-Hub-Signature-256 header');
-      return res.sendStatus(403);
-    }
-
-    // Use rawBody for signature verification
-    const rawBody = req.rawBody || Buffer.from(JSON.stringify(req.body));
-    const expected = 'sha256=' + crypto
-      .createHmac('sha256', appSecret)
-      .update(rawBody)
-      .digest('hex');
-
-    // Timing-safe comparison to prevent timing attacks
-    if (!crypto.timingSafeEqual(
-      Buffer.from(signature), 
-      Buffer.from(expected)
-    )) {
-      console.warn('Invalid webhook signature');
-      return res.sendStatus(403);
-    }
-
-    return next();
-  } catch (error) {
-    console.error('Signature verification error:', error);
-    return res.sendStatus(403);
+/** Relay signature verification */
+function verifyRelaySignature(req) {
+  const RELAY_SECRET = process.env.RELAY_SECRET;
+  if (!RELAY_SECRET) {
+    console.error('RELAY_SECRET not set in environment');
+    return false;
   }
+
+  const sig = req.get('X-Relay-Signature');
+  if (!sig || !sig.startsWith('sha256=')) {
+    console.warn('Missing or invalid X-Relay-Signature header');
+    return false;
+  }
+
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', RELAY_SECRET)
+    .update(req.rawBody || Buffer.from(JSON.stringify(req.body || {})))
+    .digest('hex');
+
+  return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 }
 
-/** GET: webhook verification challenge (Meta's verification) */
-router.get('/webhook', verifyWebhook);
+// In-memory store for idempotency (replace with Redis/DB in production)
+const seen = new Set();
 
-/** POST: webhook receiver (signature-verified) */
-router.post('/webhook', verifyMetaSignature, handleWebhook);
+/** POST: webhook receiver (relay-verified, idempotent) */
+router.post('/webhook', (req, res) => {
+  // Verify relay signature
+  if (!verifyRelaySignature(req)) {
+    console.warn('Invalid relay signature');
+    return res.sendStatus(403);
+  }
+
+  // ACK immediately for fast response
+  res.sendStatus(200);
+
+  // Process webhook asynchronously
+  setImmediate(() => {
+    try {
+      const value = req.body?.entry?.[0]?.changes?.[0]?.value || {};
+
+      // Ignore inbound vendor messages — Admin owns conversations
+      if (Array.isArray(value.messages) && value.messages.length) {
+        console.log('Ignoring inbound vendor message');
+        return;
+      }
+
+      // Handle delivery/read/template status updates (optional)
+      const statusId = value?.statuses?.[0]?.id || value?.message_template_id;
+      if (statusId) {
+        // Check idempotency
+        if (seen.has(statusId)) {
+          console.log('Duplicate status update ignored:', statusId);
+          return;
+        }
+        seen.add(statusId);
+        
+        // TODO: persist in DB for analytics/retries
+        console.log('Status update received:', {
+          id: statusId,
+          status: value?.statuses?.[0]?.status,
+          timestamp: value?.statuses?.[0]?.timestamp
+        });
+      }
+
+    } catch (error) {
+      console.error('Error processing webhook:', error);
+    }
+  });
+});
 
 /** POST: send photo-upload invitation via Meta */
 router.post('/send-photo-upload-invitation', async (req, res) => {
