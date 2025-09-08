@@ -59,7 +59,7 @@ function testTemplateNames() {
   console.log('\n🧪 Testing Different Template Names\n');
   
   const testTemplates = [
-    'new_review_rating_notif_to_vendor',
+    'new_review_rating_notif_to_vendor_util',
     'review_notification',
     'review_alert',
     'vendor_review_notification'
@@ -67,10 +67,10 @@ function testTemplateNames() {
   
   testTemplates.forEach(templateName => {
     console.log(`📝 Template: ${templateName}`);
-    console.log(`   Status: ${templateName === 'new_review_rating_notif_to_vendor' ? '✅ CORRECT' : '❌ INCORRECT'}`);
+    console.log(`   Status: ${templateName === 'new_review_rating_notif_to_vendor_util' ? '✅ CORRECT' : '❌ INCORRECT'}`);
   });
   
-  console.log('\n💡 Recommendation: Use "new_review_rating_notif_to_vendor" as your template name');
+  console.log('\n💡 Recommendation: Use "new_review_rating_notif_to_vendor_util" as your template name');
 }
 
 // Run tests

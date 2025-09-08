@@ -8,7 +8,7 @@
 ```
 
 ### **Root Cause**
-The system is trying to use a template called `review_notification`, but your actual template name is `new_review_rating_notif_to_vendor`.
+The system is trying to use a template called `review_notification`, but your actual template name is `new_review_rating_notif_to_vendor_util`.
 
 ## 🔧 **Immediate Fix**
 
@@ -16,7 +16,7 @@ The system is trying to use a template called `review_notification`, but your ac
 Set the correct template name in your `.env` file:
 
 ```bash
-WHATSAPP_REVIEW_TEMPLATE_NAME=new_review_rating_notif_to_vendor
+WHATSAPP_REVIEW_TEMPLATE_NAME=new_review_rating_notif_to_vendor_util
 ```
 
 ### **Step 2: Restart Your Application**
@@ -47,7 +47,7 @@ This will:
 
 ### **Expected Output**
 ```
-📝 Template: new_review_rating_notif_to_vendor
+📝 Template: new_review_rating_notif_to_vendor_util
    Status: ✅ CORRECT
 
 📤 Testing review notification...
@@ -66,12 +66,12 @@ echo $WHATSAPP_REVIEW_TEMPLATE_NAME
 1. Go to [developers.facebook.com](https://developers.facebook.com)
 2. Navigate to your WhatsApp Business app
 3. Go to WhatsApp > Message Templates
-4. Verify template `new_review_rating_notif_to_vendor` exists and is approved
+4. Verify template `new_review_rating_notif_to_vendor_util` exists and is approved
 
 ### **3. Test Review Submission**
 Submit a new review and check the logs for:
 ```
-📝 Attempting to use template: new_review_rating_notif_to_vendor
+📝 Attempting to use template: new_review_rating_notif_to_vendor_util
 ✅ Template message sent successfully
 ```
 
@@ -97,7 +97,7 @@ To test text message fallback, temporarily remove the template name:
 ## 📱 **Template Structure Requirements**
 
 ### **Your Template Should Have**
-- **Name**: `new_review_rating_notif_to_vendor`
+- **Name**: `new_review_rating_notif_to_vendor_util`
 - **Language**: English
 - **Category**: Customer Care
 - **Variables**: 3 text parameters
@@ -133,7 +133,7 @@ Remove template configuration to use text messages:
 
 ```bash
 # Comment out template name
-# WHATSAPP_REVIEW_TEMPLATE_NAME=new_review_rating_notif_to_vendor
+# WHATSAPP_REVIEW_TEMPLATE_NAME=new_review_rating_notif_to_vendor_util
 ```
 
 ### **Option 2: Create New Template**
@@ -157,7 +157,7 @@ If the current template has issues:
 
 ### **Common Success Patterns**
 ```
-📝 Attempting to use template: new_review_rating_notif_to_vendor
+📝 Attempting to use template: new_review_rating_notif_to_vendor_util
 ✅ Template message sent successfully
 📋 Result: { messages: [{ id: 'msg_123' }] }
 ```
@@ -188,4 +188,4 @@ If the current template has issues:
 
 **Status**: 🔧 **FIX AVAILABLE**
 
-The issue has been identified and fixed. Update your environment variable to use the correct template name `new_review_rating_notif_to_vendor` and restart your application.
+The issue has been identified and fixed. Update your environment variable to use the correct template name `new_review_rating_notif_to_vendor_util` and restart your application.

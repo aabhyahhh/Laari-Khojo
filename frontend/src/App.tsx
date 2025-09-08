@@ -204,7 +204,7 @@ function MapDisplay() {
 
   // Carousel state
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [carouselInterval, setCarouselInterval] = useState<number | null>(null);
+  const [carouselInterval, setCarouselInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Touch/swipe functionality for carousel
   const [touchStart, setTouchStart] = useState<number | null>(null);

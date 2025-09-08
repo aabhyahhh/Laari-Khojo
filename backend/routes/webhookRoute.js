@@ -5,6 +5,8 @@ const router = express.Router();
 
 const { sendPhotoUploadInvitation } = require('../services/metaWhatsAppService'); 
 const User = require('../models/userModel');
+const VendorLocation = require('../models/vendorLocationModel');
+const { sendLocationConfirmation } = require('../controllers/webhookController');
 
 /** Helpers */
 const digitsOnly = (v) => String(v || '').replace(/\D/g, '');
@@ -51,13 +53,118 @@ router.post('/webhook', (req, res) => {
   res.sendStatus(200);
 
   // Process webhook asynchronously
-  setImmediate(() => {
+  setImmediate(async () => {
     try {
       const value = req.body?.entry?.[0]?.changes?.[0]?.value || {};
 
-      // Ignore inbound vendor messages — Admin owns conversations
+      // Process inbound vendor messages for location updates
       if (Array.isArray(value.messages) && value.messages.length) {
-        console.log('Ignoring inbound vendor message');
+        console.log('Processing inbound vendor messages for location updates');
+        
+        for (const message of value.messages) {
+          const phoneNumber = digitsOnly(message.from);
+          const messageId = message.id;
+          const timestamp = new Date(parseInt(message.timestamp) * 1000);
+          
+          // Handle location messages
+          if (message.type === 'location' && message.location) {
+            console.log('Processing location message from:', phoneNumber);
+            
+            try {
+              const locationData = {
+                phone: phoneNumber,
+                location: {
+                  lat: message.location.latitude,
+                  lng: message.location.longitude,
+                  name: message.location.name || null,
+                  address: message.location.address || null
+                },
+                lastMessageId: messageId,
+                lastMessageTs: timestamp
+              };
+              
+              // Update or create vendor location
+              await VendorLocation.findOneAndUpdate(
+                { phone: phoneNumber },
+                locationData,
+                { upsert: true, new: true }
+              );
+              
+              console.log('Location updated for vendor:', phoneNumber, 'at:', locationData.location.lat, locationData.location.lng);
+              
+              // Send confirmation message
+              await sendLocationConfirmation(
+                withCountryCode(phoneNumber),
+                locationData.location.lat,
+                locationData.location.lng
+              );
+              
+            } catch (error) {
+              console.error('Error processing location message:', error);
+            }
+          }
+          // Handle text messages with Google Maps URLs
+          else if (message.type === 'text' && message.text) {
+            const text = message.text.body;
+            console.log('Processing text message from:', phoneNumber, 'Content:', text);
+            
+            // Check for Google Maps URLs
+            const mapsPatterns = [
+              /@([-+]?\d*\.\d+),([-+]?\d*\.\d+)/,
+              /[?&]q=([-+]?\d*\.\d+),([-+]?\d*\.\d+)/,
+              /\/place\/[^@]+@([-+]?\d*\.\d+),([-+]?\d*\.\d+)/
+            ];
+            
+            let coordinates = null;
+            for (const pattern of mapsPatterns) {
+              const match = text.match(pattern);
+              if (match) {
+                const latitude = parseFloat(match[1]);
+                const longitude = parseFloat(match[2]);
+                
+                if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
+                  coordinates = { latitude, longitude };
+                  break;
+                }
+              }
+            }
+            
+            if (coordinates) {
+              try {
+                const locationData = {
+                  phone: phoneNumber,
+                  location: {
+                    lat: coordinates.latitude,
+                    lng: coordinates.longitude,
+                    name: null,
+                    address: null
+                  },
+                  lastMessageId: messageId,
+                  lastMessageTs: timestamp
+                };
+                
+                // Update or create vendor location
+                await VendorLocation.findOneAndUpdate(
+                  { phone: phoneNumber },
+                  locationData,
+                  { upsert: true, new: true }
+                );
+                
+                console.log('Location updated from Maps URL for vendor:', phoneNumber, 'at:', coordinates.latitude, coordinates.longitude);
+                
+                // Send confirmation message
+                await sendLocationConfirmation(
+                  withCountryCode(phoneNumber),
+                  coordinates.latitude,
+                  coordinates.longitude
+                );
+                
+              } catch (error) {
+                console.error('Error processing Maps URL message:', error);
+              }
+            }
+          }
+        }
         return;
       }
 
