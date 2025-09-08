@@ -163,7 +163,7 @@ const sendReviewNotification = async (vendorPhoneNumber, reviewData) => {
     console.log('📱 Formatted phone number:', formattedNumber);
     
     // Use template with variables
-    const templateName = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME || 'review_notification';
+    const templateName = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME || 'new_review_rating_notif_to_vendor_util';
     const components = [
       {
         type: "body",

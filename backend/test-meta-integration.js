@@ -40,7 +40,7 @@ async function testMetaIntegration() {
 
     // Test 2: Send a template message (if template exists)
     console.log('\n📤 Test 2: Sending template message...');
-    const templateName = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME || 'review_notification';
+    const templateName = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME || 'new_review_rating_notif_to_vendor_util';
     
     try {
       // Example template components for review notification

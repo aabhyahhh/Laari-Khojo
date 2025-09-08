@@ -95,7 +95,7 @@ WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
 GRAPH_API_VERSION=v21.0
 
 # Optional (for templates)
-WHATSAPP_REVIEW_TEMPLATE_NAME=review_notification
+WHATSAPP_REVIEW_TEMPLATE_NAME=new_review_rating_notif_to_vendor_util
 ```
 
 ### **Meta Developer Console**
