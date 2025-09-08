@@ -58,14 +58,14 @@ WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
 GRAPH_API_VERSION=v21.0
 
 # Optional: Template name (if not set, will use text messages)
-WHATSAPP_REVIEW_TEMPLATE_NAME=review_notification
+WHATSAPP_REVIEW_TEMPLATE_NAME=new_review_rating_notif_to_vendor_util
 ```
 
 ### Step 2: Meta Developer Console Setup
 1. Go to [developers.facebook.com](https://developers.facebook.com)
 2. Navigate to your WhatsApp Business app
 3. Go to WhatsApp > Message Templates
-4. Create a new template with the name `review_notification`
+4. Create a new template with the name `new_review_rating_notif_to_vendor_util`
 5. Use this template structure:
 
 **Template Name**: `new_review_rating_notif_to_vendor_util`

@@ -32,7 +32,7 @@ async function testMetaWhatsApp() {
   console.log('3. Testing template message...');
   try {
     const testPhone = process.env.TEST_PHONE_NUMBER || '+919876543210';
-    const templateName = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME || 'review_notification';
+    const templateName = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME || 'new_review_rating_notif_to_vendor_util';
     
     console.log(`📤 Sending template message to: ${testPhone}`);
     console.log(`📝 Using template: ${templateName}`);
