@@ -50,21 +50,21 @@ if (process.env.ACCESS_SECRET_TOKEN) {
 
 console.log('\n5. Testing required modules...');
 try {
-  require('./models/userModel');
+  require('../models/userModel');
   console.log('✅ User model loaded');
 } catch (error) {
   console.log('❌ Error loading user model:', error.message);
 }
 
 try {
-  require('./controllers/otpController');
+  require('../controllers/otpController');
   console.log('✅ OTP controller loaded');
 } catch (error) {
   console.log('❌ Error loading OTP controller:', error.message);
 }
 
 try {
-  require('./controllers/imageUploadController');
+  require('../controllers/imageUploadController');
   console.log('✅ Image upload controller loaded');
 } catch (error) {
   console.log('❌ Error loading image upload controller:', error.message);

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { sendText, sendTemplate, validateMetaConfig } = require('./services/metaWhatsAppService');
+const { sendText, sendTemplate, validateMetaConfig } = require('../services/metaWhatsAppService');
 
 // Test phone number (replace with your WhatsApp number)
 const testPhoneNumber = process.env.TEST_PHONE_NUMBER || '+919876543210';

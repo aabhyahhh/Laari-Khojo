@@ -1,6 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const VendorLocation = require('./models/vendorLocationModel');
+const VendorLocation = require('../models/vendorLocationModel');
 
 async function checkLocationUpdates() {
   try {

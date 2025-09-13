@@ -1,7 +1,7 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const User = require("./models/userModel");
+const User = require("../models/userModel");
 
 const MONGO_URI = process.env.MONGO_URI;
 
@@ -29,13 +29,9 @@ async function createAdminUser() {
       contactNumber: "9999999999",
       mapsLink: "https://maps.google.com/@23.0225,72.5714,15z", // Default location
       operatingHours: {
-        monday: { open: "00:00", close: "23:59", isOpen: true },
-        tuesday: { open: "00:00", close: "23:59", isOpen: true },
-        wednesday: { open: "00:00", close: "23:59", isOpen: true },
-        thursday: { open: "00:00", close: "23:59", isOpen: true },
-        friday: { open: "00:00", close: "23:59", isOpen: true },
-        saturday: { open: "00:00", close: "23:59", isOpen: true },
-        sunday: { open: "00:00", close: "23:59", isOpen: true }
+        openTime: "00:00",
+        closeTime: "23:59",
+        days: [0, 1, 2, 3, 4, 5, 6] // All days of the week (0 = Sunday)
       },
       foodType: "admin"
     });

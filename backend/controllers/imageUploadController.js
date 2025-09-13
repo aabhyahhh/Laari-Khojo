@@ -1,5 +1,5 @@
 const User = require("../models/userModel");
-const cloudinary = require("../cloudinaryConfig");
+const cloudinary = require("../test scripts/cloudinaryConfig");
 const multer = require("multer");
 const { sendPhotoUploadConfirmation } = require('../services/metaWhatsAppService');
 

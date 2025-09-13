@@ -4,7 +4,7 @@ import "./Login.css";
 import { Link } from "react-router-dom";
 
 // Update this to your proxy URL if using the proxy solution
-const API_URL = "https://laari-khojo-backend.onrender.com/";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 interface LoginProps {
   onLoginSuccess?: (token: string) => void;

@@ -1,7 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const VendorLocation = require('./models/vendorLocationModel');
-const User = require('./models/userModel');
+const VendorLocation = require('../models/vendorLocationModel');
+const User = require('../models/userModel');
 
 async function diagnoseWebhookWarnings() {
   console.log('🔍 Diagnosing Webhook Warning Messages...\n');

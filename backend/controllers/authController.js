@@ -112,10 +112,13 @@ const loginUser = async (req, res) => {
 
     //accepting response from api
     const { email, password } = req.body;
+    console.log("Login attempt for email:", email);
 
     const userData = await User.findOne({ email });
+    console.log("User found:", userData ? "Yes" : "No");
 
     if (!userData) {
+      console.log("User not found for email:", email);
       return res.status(400).json({
         success: false,
         msg: "Email and Password is incorrect!",
