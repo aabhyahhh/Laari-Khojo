@@ -7,7 +7,8 @@ import Login from "./components/Login";
 import ImageUploadModal from "./components/ImageUploadModal";
 import ReportLocationModal from "./components/ReportLocationModal";
 import VendorUploadPage from "./components/VendorUploadPage";
-import AdminPanel from "./components/AdminPanel";
+// import AdminPanel from "./components/AdminPanel"; // legacy modal, not used
+import AdminPage from "./components/AdminPage";
 import laari from "./assets/logo_cropped.png";
 import logo from "./assets/logo.png";
 import { useEffect, useRef, useState } from "react";
@@ -16,6 +17,7 @@ import "leaflet/dist/leaflet.css";
 import "./App.css";
 import usePageTracking from './usePageTracking';
 import api, { normalizeVendor, Review } from './api/client';
+import { trackVendorClick } from './utils/vendorClickTracker';
 
 
 import ReactGA from 'react-ga4';
@@ -215,8 +217,6 @@ function MapDisplay() {
 
   const navigate = useNavigate();
 
-  // Admin panel state
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   // Auto-rotation for carousel
   useEffect(() => {
@@ -1073,6 +1073,18 @@ function MapDisplay() {
             className: vendorsAtLocation.length > 1 ? 'grouped-popup-container' : 'custom-popup-container'
           });
 
+        // Add click tracking for each vendor in the group
+        vendorsAtLocation.forEach(vendor => {
+          marker.on('click', async () => {
+            try {
+              await trackVendorClick(vendor._id);
+              console.log(`Tracked click for vendor: ${vendor.name || vendor.businessName || vendor.vendorName}`);
+            } catch (error) {
+              console.error('Error tracking vendor click:', error);
+            }
+          });
+        });
+
         // Store marker with a combined key for grouped locations
         const markerKey = vendorsAtLocation.length === 1 
           ? vendorsAtLocation[0]._id 
@@ -1564,20 +1576,6 @@ function MapDisplay() {
     setTouchStart(null);
     setTouchEnd(null);
   };
-
-  // Admin panel keyboard shortcut
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      // Ctrl/Cmd + Shift + A to open admin panel
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'A') {
-        event.preventDefault();
-        setShowAdminPanel(true);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyPress);
-    return () => document.removeEventListener('keydown', handleKeyPress);
-  }, []);
 
   return (
     <div style={{ height: "100vh", width: "100vw", position: "relative" }}>
@@ -3332,35 +3330,6 @@ function MapDisplay() {
         />
       )}
 
-      {/* Admin Panel */}
-      <AdminPanel
-        isOpen={showAdminPanel}
-        onClose={() => setShowAdminPanel(false)}
-      />
-
-      {/* Hidden Admin Button (for accessibility) */}
-      <button
-        onClick={() => setShowAdminPanel(true)}
-        style={{
-          position: 'fixed',
-          top: '10px',
-          right: '10px',
-          width: '40px',
-          height: '40px',
-          backgroundColor: 'rgba(0,0,0,0.1)',
-          border: 'none',
-          borderRadius: '50%',
-          cursor: 'pointer',
-          zIndex: 1000,
-          opacity: 0.3,
-          transition: 'opacity 0.2s'
-        }}
-        onMouseEnter={(e) => (e.target as HTMLButtonElement).style.opacity = '0.8'}
-        onMouseLeave={(e) => (e.target as HTMLButtonElement).style.opacity = '0.3'}
-        title="Admin Panel (Ctrl+Shift+A)"
-      >
-        ⚙️
-      </button>
     </div>
   );
 }
@@ -3368,11 +3337,14 @@ function MapDisplay() {
 function App() {
   const location = useLocation();
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  // const [showAdminPanel, setShowAdminPanel] = useState(false);
   
   const handleLoginSuccess = (token: string) => {
     setToken(token);
   };
   usePageTracking(); // tracks every route change
+
+  // Removed keyboard shortcut for admin access per requirement
 
   return (
     <div style={{ height: "100vh", width: "100vw", display: "flex", flexDirection: "column" }}>
@@ -3381,6 +3353,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomeScreen />} />
           <Route path="/map" element={<MapDisplay />} />
+          <Route path="/admin" element={<AdminPage token={token} />} />
           <Route path="/vendor-upload" element={<VendorUploadPage />} />
           <Route path="/upload" element={<VendorUploadPage />} />
           <Route path="/vendor" element={<VendorUploadPage />} />
@@ -3404,6 +3377,8 @@ function App() {
           />
         </Routes>
       </div>
+      
+      {/* Admin modal removed per requirement; use /admin route instead */}
     </div>
   );
 }

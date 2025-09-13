@@ -16,6 +16,8 @@ const webhookRoutes = require("./routes/webhookRoute");
 const reviewRoutes = require("./routes/reviewRoute");
 const otpRoutes = require("./routes/otpRoute");
 const imageUploadRoutes = require("./routes/imageUploadRoute");
+const adminRoutes = require("./routes/adminRoute");
+const vendorClickRoutes = require("./routes/vendorClickRoute");
 
 const allowedOrigins = [
   "https://laarikhojo.in",
@@ -103,6 +105,8 @@ app.use("/api", webhookRoutes);
 app.use("/api", reviewRoutes);
 app.use("/api", otpRoutes);
 app.use("/api", imageUploadRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/vendor-clicks", vendorClickRoutes);
 
 app.get("/api/expand-url", async (req, res) => {
   const { url } = req.query;

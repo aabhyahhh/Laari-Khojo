@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { getApiBaseUrl } from '../api/config';
 import { Vendor } from '../api/client';
+import VendorAnalytics from './VendorAnalytics';
 
 interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  authToken?: string;
 }
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, authToken }) => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -168,19 +171,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
             fontSize: '24px',
             fontWeight: '600'
           }}>
-            📱 WhatsApp Photo Upload Admin
+            📱 Admin Panel
           </h2>
           <p style={{ 
             margin: '0', 
             color: '#666', 
             fontSize: '14px' 
           }}>
-            Send photo upload invitations to vendors via WhatsApp
+            Manage vendors and view analytics
           </p>
         </div>
 
-        {/* Bulk Action */}
-        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
+        {/* Action Buttons */}
+        <div style={{ marginBottom: '24px', textAlign: 'center', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             onClick={sendBulkInvitations}
             disabled={loading}
@@ -195,7 +198,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
               cursor: loading ? 'not-allowed' : 'pointer'
             }}
           >
-            {loading ? 'Sending...' : '📤 Send Invitations to All Vendors Without Photos'}
+            {loading ? 'Sending...' : '📤 Send Photo Invitations'}
+          </button>
+          
+          <button
+            onClick={() => setShowAnalytics(true)}
+            disabled={!authToken}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: !authToken ? '#ccc' : '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '500',
+              cursor: !authToken ? 'not-allowed' : 'pointer'
+            }}
+          >
+            📊 View Click Analytics
           </button>
         </div>
 
@@ -331,6 +351,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
           `}
         </style>
       </div>
+      
+      {/* Vendor Analytics Modal */}
+      {showAnalytics && authToken && (
+        <VendorAnalytics
+          isOpen={showAnalytics}
+          onClose={() => setShowAnalytics(false)}
+          authToken={authToken}
+          mode={'modal'}
+        />
+      )}
     </div>
   );
 };
