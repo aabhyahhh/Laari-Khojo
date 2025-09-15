@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { sendPhotoUploadInvitation } = require('./services/metaWhatsAppService');
+const { sendPhotoUploadInvitation } = require('../services/metaWhatsAppService');
 
 async function testWhatsAppDirect() {
   console.log('🧪 Testing WhatsApp Photo Upload Service Directly\n');

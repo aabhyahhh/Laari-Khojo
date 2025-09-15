@@ -13,6 +13,7 @@ import './MapPreview.css';
 import laari from '../assets/logo_cropped.png';
 import api, { Review } from '../api/client';
 import ReportLocationModal from './ReportLocationModal';
+import { trackVendorClick } from '../utils/vendorClickTracker';
 
 interface Vendor {
   _id: string;
@@ -381,6 +382,16 @@ const MapPreview: React.FC<MapPreviewProps> = ({ vendors = [] }) => {
           marker.bindPopup(popupContent, {
             maxWidth: 250,
             className: 'custom-popup-container'
+          });
+
+          // Add click tracking
+          marker.on('click', async () => {
+            try {
+              await trackVendorClick(vendor._id);
+              console.log(`Tracked click for vendor: ${vendor.name}`);
+            } catch (error) {
+              console.error('Error tracking vendor click:', error);
+            }
           });
 
         marker.addTo(mapRef.current!);

@@ -32,6 +32,19 @@ const userSchema = new mongoose.Schema({
         type: operatingHoursSchema,
         required: true
     },
+    latitude: {
+        type: Number,
+        required: false
+    },
+    longitude: {
+        type: Number,
+        required: false
+    },
+    foodType: {
+        type: String,
+        enum: ['veg', 'non-veg', 'swaminarayan', 'jain', 'none', 'admin'],
+        default: 'none'
+    },
     profilePicture: {
         type: String,
         default: null

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { sendReviewNotification, formatPhoneNumber } = require('./services/metaWhatsAppService');
+const { sendReviewNotification, formatPhoneNumber } = require('../services/metaWhatsAppService');
 
 // Test review notification
 async function testReviewNotification() {

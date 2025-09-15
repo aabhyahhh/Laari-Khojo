@@ -5,7 +5,7 @@ import React, { useState, useRef } from 'react';
 const getApiBaseUrl = () => {
   return import.meta.env.VITE_API_URL || (import.meta.env.DEV 
     ? 'http://localhost:3000' 
-    : 'https://laari-khojo-backend.onrender.com');
+    : 'http://localhost:3000');
 };
 
 interface ImageUploadModalProps {

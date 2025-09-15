@@ -4,7 +4,7 @@ const {
   sendTemplate, 
   validateMetaConfig,
   sendReviewNotification 
-} = require('./services/metaWhatsAppService');
+} = require('../services/metaWhatsAppService');
 
 async function testMetaIntegration() {
   console.log('🧪 Testing Meta WhatsApp Business API Integration\n');

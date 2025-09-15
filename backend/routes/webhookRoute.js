@@ -16,6 +16,28 @@ const withCountryCode = (msisdn) => {
   return msisdn;
 };
 
+/** Meta signature verification (for direct webhooks) */
+function verifyMetaSignature(req) {
+  const APP_SECRET = process.env.APP_SECRET;
+  if (!APP_SECRET) {
+    console.error('APP_SECRET not set in environment');
+    return false;
+  }
+
+  const sig = req.get('x-hub-signature-256');
+  if (!sig || !sig.startsWith('sha256=')) {
+    console.warn('Missing or invalid x-hub-signature-256 header');
+    return false;
+  }
+
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', APP_SECRET)
+    .update(req.rawBody || Buffer.from(JSON.stringify(req.body || {})))
+    .digest('hex');
+
+  return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+}
+
 /** Relay signature verification */
 function verifyRelaySignature(req) {
   const RELAY_SECRET = process.env.RELAY_SECRET;
@@ -41,12 +63,38 @@ function verifyRelaySignature(req) {
 // In-memory store for idempotency (replace with Redis/DB in production)
 const seen = new Set();
 
-/** POST: webhook receiver (relay-verified, idempotent) */
+/** GET: webhook verification (for Meta's challenge) */
+router.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log('✅ Webhook verified successfully');
+    res.status(200).send(challenge);
+  } else {
+    console.warn('❌ Webhook verification failed');
+    res.sendStatus(403);
+  }
+});
+
+/** POST: webhook receiver (supports both relay and direct Meta webhooks) */
 router.post('/webhook', (req, res) => {
-  // Verify relay signature
-  if (!verifyRelaySignature(req)) {
-    console.warn('Invalid relay signature');
+  // Try relay signature first, then fall back to Meta signature
+  const isRelayValid = verifyRelaySignature(req);
+  const isMetaValid = verifyMetaSignature(req);
+  
+  if (!isRelayValid && !isMetaValid) {
+    console.warn('❌ Invalid webhook signature (neither relay nor Meta)');
     return res.sendStatus(403);
+  }
+
+  if (isRelayValid) {
+    console.log('✅ Relay signature verified');
+  } else if (isMetaValid) {
+    console.log('✅ Meta signature verified');
   }
 
   // ACK immediately for fast response
@@ -225,6 +273,51 @@ router.post('/send-photo-upload-invitation', async (req, res) => {
       success: false,
       msg: 'Error sending photo upload invitation',
       error: error.message,
+    });
+  }
+});
+
+/** GET: Check webhook status and recent location updates */
+router.get('/webhook/status', async (req, res) => {
+  try {
+    // Get recent location updates (last 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentLocations = await VendorLocation.find({
+      updatedAt: { $gte: oneDayAgo }
+    }).sort({ updatedAt: -1 }).limit(10);
+
+    // Get total count
+    const totalLocations = await VendorLocation.countDocuments();
+
+    // Check environment variables
+    const envStatus = {
+      APP_SECRET: !!process.env.APP_SECRET,
+      RELAY_SECRET: !!process.env.RELAY_SECRET,
+      WHATSAPP_VERIFY_TOKEN: !!process.env.WHATSAPP_VERIFY_TOKEN,
+      WHATSAPP_TOKEN: !!process.env.WHATSAPP_TOKEN,
+      WHATSAPP_PHONE_NUMBER_ID: !!process.env.WHATSAPP_PHONE_NUMBER_ID
+    };
+
+    res.json({
+      success: true,
+      status: 'Webhook system operational',
+      environment: envStatus,
+      statistics: {
+        totalLocations,
+        recentUpdates: recentLocations.length,
+        lastUpdate: recentLocations[0]?.updatedAt || null
+      },
+      recentLocations: recentLocations.map(loc => ({
+        phone: loc.phone,
+        location: loc.location,
+        updatedAt: loc.updatedAt
+      }))
+    });
+  } catch (error) {
+    console.error('Error checking webhook status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });

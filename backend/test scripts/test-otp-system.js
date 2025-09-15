@@ -1,4 +1,4 @@
-const { sendOTPMessage, sendOTPTemplate, formatPhoneNumber, validateMetaConfig } = require('./services/metaWhatsAppService');
+const { sendOTPMessage, sendOTPTemplate, formatPhoneNumber, validateMetaConfig } = require('../services/metaWhatsAppService');
 
 // Test OTP message sending
 async function testOTPMessage() {

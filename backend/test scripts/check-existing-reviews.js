@@ -1,7 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const Review = require('./models/reviewModel');
-const User = require('./models/userModel');
+const Review = require('../models/reviewModel');
+const User = require('../models/userModel');
 
 // Connect to MongoDB
 const MONGO_URI = process.env.MONGO_URI;

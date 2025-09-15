@@ -1,4 +1,4 @@
-const { sendReviewNotification, validateMetaConfig } = require('./services/metaWhatsAppService');
+const { sendReviewNotification, validateMetaConfig } = require('../services/metaWhatsAppService');
 
 async function testTemplateAndFallback() {
   console.log('🧪 Testing Template and Fallback Functionality\n');

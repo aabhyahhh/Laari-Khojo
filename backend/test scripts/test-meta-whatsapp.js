@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { sendText, sendTemplate, validateMetaConfig } = require('./services/metaWhatsAppService');
+const { sendText, sendTemplate, validateMetaConfig } = require('../services/metaWhatsAppService');
 
 async function testMetaWhatsApp() {
   console.log('🧪 Testing Meta API WhatsApp Integration\n');

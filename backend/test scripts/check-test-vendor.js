@@ -1,6 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const User = require('./models/userModel');
+const User = require('../models/userModel');
 
 async function checkTestVendor() {
   console.log('🔍 Checking for test vendor in database...\n');

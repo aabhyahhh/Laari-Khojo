@@ -1,8 +1,8 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const User = require('./models/userModel');
-const Review = require('./models/reviewModel');
-const { sendReviewNotification } = require('./services/metaWhatsAppService');
+const User = require('../models/userModel');
+const Review = require('../models/reviewModel');
+const { sendReviewNotification } = require('../services/metaWhatsAppService');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
