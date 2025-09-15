@@ -3336,11 +3336,13 @@ function MapDisplay() {
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   // const [showAdminPanel, setShowAdminPanel] = useState(false);
   
   const handleLoginSuccess = (token: string) => {
     setToken(token);
+    navigate('/admin');
   };
   usePageTracking(); // tracks every route change
 

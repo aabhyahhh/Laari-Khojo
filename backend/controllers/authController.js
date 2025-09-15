@@ -190,25 +190,34 @@ const getProfile = async (req, res) => {
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({}, { password: 0 }); // Exclude passwords
-    
+
+    // Normalize helpers (align with app.js logic used by /api/all-users there)
+    const digitsOnly = (v) => String(v || '').replace(/\D/g, '');
+    const withCC = (msisdn) => (/^\d{10}$/.test(msisdn) ? '91' + msisdn : msisdn);
+
     // Get all vendor locations from WhatsApp
     const vendorLocations = await VendorLocation.find({});
-    
-    // Create a map of phone numbers to location data
+
+    // Create a map of normalized phone numbers to location data
     const locationMap = new Map();
-    vendorLocations.forEach(loc => {
-      locationMap.set(loc.phone, {
+    vendorLocations.forEach((loc) => {
+      if (!loc || !loc.location) return;
+      const key = withCC(digitsOnly(loc.phone));
+      locationMap.set(key, {
         latitude: loc.location.lat,
         longitude: loc.location.lng,
-        updatedAt: loc.updatedAt
+        updatedAt: loc.updatedAt,
       });
     });
-    
+
     // Merge location data with user data
-    const usersWithLocation = users.map(user => {
+    const usersWithLocation = users.map((user) => {
       const userData = user.toObject();
-      const locationData = locationMap.get(user.contactNumber);
-      
+
+      // Normalize user's contact number for lookup
+      const uKey = withCC(digitsOnly(user.contactNumber));
+      const locationData = locationMap.get(uKey);
+
       if (locationData) {
         // If WhatsApp location exists, use it (it's more recent/accurate)
         userData.latitude = locationData.latitude;
@@ -229,10 +238,10 @@ const getAllUsers = async (req, res) => {
           console.error(`Error parsing mapsLink for user ${user._id}:`, error);
         }
       }
-      
+
       return userData;
     });
-    
+
     return res.status(200).json({
       success: true,
       msg: "All Laari Vendors",

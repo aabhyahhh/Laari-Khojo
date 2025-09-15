@@ -14,6 +14,8 @@ interface Vendor {
   email?: string;
   contactNumber: string;
   mapsLink: string;
+  latitude?: number;
+  longitude?: number;
   operatingHours: {
     openTime: string;
     closeTime: string;
@@ -176,8 +178,19 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     if (userLocation && vendors.length > 0) {
       const count = vendors.filter((vendor) => {
-        const coords = extractCoordinates(vendor.mapsLink);
+        // Prefer explicit coordinates from API if available; fallback to parsing mapsLink
+        const hasApiCoords =
+          typeof vendor.latitude === 'number' &&
+          isFinite(vendor.latitude) &&
+          typeof vendor.longitude === 'number' &&
+          isFinite(vendor.longitude);
+
+        const coords = hasApiCoords
+          ? { latitude: vendor.latitude as number, longitude: vendor.longitude as number }
+          : extractCoordinates(vendor.mapsLink);
+
         if (!coords) return false;
+
         const dist = haversineDistance(
           userLocation.latitude,
           userLocation.longitude,
