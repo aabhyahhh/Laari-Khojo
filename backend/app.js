@@ -121,37 +121,64 @@ app.get("/api/expand-url", async (req, res) => {
   }
 });
 
+// --- Enhanced /api/all-users endpoint ---
 app.get("/api/all-users", async (req, res) => {
   try {
     const vendors = await User.find({})
       .limit(100)
       .sort({ updatedAt: -1 })
-      .select("-password"); // Exclude password field for security
+      .select("-password");
 
     // Get all vendor locations captured via WhatsApp
     const vendorLocations = await VendorLocation.find({});
 
-    // Map normalized phone -> location data
+    // Create a set of current vendor phones for validation
+    const currentVendorPhones = new Set();
+    vendors.forEach(vendor => {
+      if (vendor.contactNumber) {
+        const phone = vendor.contactNumber;
+        currentVendorPhones.add(phone);
+        currentVendorPhones.add(withCC(digitsOnly(phone)));
+        currentVendorPhones.add(digitsOnly(phone));
+      }
+    });
+
+    // Map normalized phone -> location data (only for existing vendors)
     const locationMap = new Map();
     vendorLocations.forEach((loc) => {
       if (!loc || !loc.location) return;
-      const key = withCC(digitsOnly(loc.phone));
-      locationMap.set(key, {
-        latitude: loc.location.lat,
-        longitude: loc.location.lng,
-        updatedAt: loc.updatedAt,
-      });
+      const locationPhone = loc.phone;
+      const normalizedLocationPhone = withCC(digitsOnly(locationPhone));
+      const digitsOnlyPhone = digitsOnly(locationPhone);
+      // Only include location data if there's a corresponding vendor
+      if (
+        currentVendorPhones.has(locationPhone) ||
+        currentVendorPhones.has(normalizedLocationPhone) ||
+        currentVendorPhones.has(digitsOnlyPhone)
+      ) {
+        const key = normalizedLocationPhone;
+        locationMap.set(key, {
+          latitude: loc.location.lat,
+          longitude: loc.location.lng,
+          updatedAt: loc.updatedAt,
+        });
+      }
     });
 
     // Merge WhatsApp location into vendor data
     const vendorsWithLocation = vendors.map((vendor) => {
       const vendorData = vendor.toObject();
-
       // Normalize vendor.contactNumber to match Meta format
       const vKey = withCC(digitsOnly(vendor.contactNumber));
       const locationData = locationMap.get(vKey);
-
-      if (locationData) {
+      // Only attach WhatsApp location if it was updated after vendor registration
+      const vendorCreatedAt = vendorData.updatedAt || vendorData.createdAt;
+      if (
+        locationData &&
+        locationData.updatedAt &&
+        vendorCreatedAt &&
+        new Date(locationData.updatedAt) > new Date(vendorCreatedAt)
+      ) {
         vendorData.latitude = locationData.latitude;
         vendorData.longitude = locationData.longitude;
         vendorData.locationUpdatedAt = locationData.updatedAt;
@@ -173,14 +200,65 @@ app.get("/api/all-users", async (req, res) => {
           );
         }
       }
-
       return vendorData;
     });
-
     res.json({ data: vendorsWithLocation });
   } catch (error) {
     console.error("Error fetching vendors:", error);
     res.status(500).json({ error: "Failed to fetch vendors" });
+  }
+});
+
+// --- Cleanup endpoint for orphaned VendorLocation entries ---
+app.post('/api/admin/cleanup-orphaned-locations', async (req, res) => {
+  try {
+    // Get all vendor phone numbers from User collection
+    const vendors = await User.find({}, { contactNumber: 1 });
+    const vendorPhones = new Set();
+    vendors.forEach(vendor => {
+      if (vendor.contactNumber) {
+        const phone = vendor.contactNumber;
+        vendorPhones.add(phone);
+        vendorPhones.add(withCC(digitsOnly(phone)));
+        vendorPhones.add(digitsOnly(phone));
+      }
+    });
+    // Find VendorLocation entries that don't have corresponding vendors
+    const allLocations = await VendorLocation.find({});
+    const orphanedLocationIds = [];
+    allLocations.forEach(location => {
+      const locationPhone = location.phone;
+      const normalizedLocationPhone = withCC(digitsOnly(locationPhone));
+      const digitsOnlyPhone = digitsOnly(locationPhone);
+      if (
+        !vendorPhones.has(locationPhone) &&
+        !vendorPhones.has(normalizedLocationPhone) &&
+        !vendorPhones.has(digitsOnlyPhone)
+      ) {
+        orphanedLocationIds.push(location._id);
+      }
+    });
+    // Delete orphaned location entries
+    if (orphanedLocationIds.length > 0) {
+      const result = await VendorLocation.deleteMany({
+        _id: { $in: orphanedLocationIds }
+      });
+      console.log(`Cleaned up ${result.deletedCount} orphaned location entries`);
+      res.json({
+        success: true,
+        message: `Cleaned up ${result.deletedCount} orphaned location entries`,
+        deletedCount: result.deletedCount
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'No orphaned location entries found',
+        deletedCount: 0
+      });
+    }
+  } catch (error) {
+    console.error('Error cleaning up orphaned locations:', error);
+    res.status(500).json({ error: 'Failed to cleanup orphaned locations' });
   }
 });
 

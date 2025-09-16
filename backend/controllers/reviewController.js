@@ -2,18 +2,25 @@ const Review = require('../models/reviewModel');
 const User = require('../models/userModel');
 const { sendReviewNotification, formatPhoneNumber } = require('../services/metaWhatsAppService');
 
-// Add a new review
+// Add a new review (requires auth)
 const addReview = async (req, res) => {
   try {
-    const { vendorId, name, email, rating, comment } = req.body;
-    if (!vendorId || !name || !email || !rating) {
+    const { vendorId, rating, comment } = req.body;
+    if (!vendorId || !rating) {
       return res.status(400).json({ success: false, msg: 'Missing required fields.' });
+    }
+
+    // Use authenticated user's identity
+    const reviewerName = req.user?.name;
+    const reviewerEmail = req.user?.email;
+    if (!reviewerName || !reviewerEmail) {
+      return res.status(401).json({ success: false, msg: 'Authentication required' });
     }
     
     console.log('📝 Adding review for vendor:', vendorId);
     console.log('📊 Review data:', { name, email, rating, comment });
     
-    const review = new Review({ vendorId, name, email, rating, comment });
+    const review = new Review({ vendorId, name: reviewerName, email: reviewerEmail, rating, comment });
     await review.save();
     
     console.log('✅ Review saved successfully with ID:', review._id);
@@ -34,11 +41,7 @@ const addReview = async (req, res) => {
           const formattedNumber = formatPhoneNumber(vendor.contactNumber);
           
           if (formattedNumber) {
-            const reviewData = {
-              rating: rating,
-              comment: comment,
-              reviewerName: name
-            };
+            const reviewData = { rating, comment, reviewerName };
             
             console.log('📤 Sending WhatsApp notification with data:', reviewData);
             console.log('📱 Using formatted number:', formattedNumber);

@@ -188,6 +188,12 @@ function MapDisplay() {
   const [reviewForm, setReviewForm] = useState({ name: '', email: '', rating: 0, comment: '' });
   const [submitting, setSubmitting] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [auth, setAuth] = useState<{ name: string; email: string } | null>(() => {
+    const name = localStorage.getItem('lk_auth_name');
+    const email = localStorage.getItem('lk_auth_email');
+    const token = localStorage.getItem('lk_auth_token');
+    return name && email && token ? { name, email } : null;
+  });
 
   // Filter states
   const [activeFilters, setActiveFilters] = useState<FilterState>({
@@ -606,9 +612,11 @@ function MapDisplay() {
       if (result.success && result.data) {
         // Normalize all vendors to ensure latitude/longitude fields
         const normalized = result.data.map(normalizeVendor);
-        setVendors(normalized);
-        console.log("Vendors set successfully:", normalized.length, "vendors");
-        return normalized;
+        // Filter out vendors without valid latitude/longitude
+        const withLocation = normalized.filter(v => typeof v.latitude === 'number' && typeof v.longitude === 'number');
+        setVendors(withLocation);
+        console.log("Vendors set successfully:", withLocation.length, "vendors");
+        return withLocation;
       } else {
         console.error("API response indicates failure:", result.error);
         setError(result.error || "Failed to fetch vendors data");
@@ -1541,10 +1549,10 @@ function MapDisplay() {
       setReviews([res.data, ...reviews]);
       setReviewForm({ name: '', email: '', rating: 0, comment: '' });
       setShowAllReviews(false);
+      setSubmitting(false);
     } else {
       setReviewError(res.error || 'Failed to submit review.');
     }
-    setSubmitting(false);
   };
 
   // Touch/swipe functionality for carousel
@@ -1575,6 +1583,40 @@ function MapDisplay() {
 
     setTouchStart(null);
     setTouchEnd(null);
+  };
+
+  const handleGoogleSignIn = () => {
+    // @ts-ignore
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      // @ts-ignore
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+        callback: async (response: any) => {
+          try {
+            const res = await api.googleLogin(response.credential);
+            if (res.success && res.data) {
+              localStorage.setItem('lk_auth_token', res.data.accessToken);
+              localStorage.setItem('lk_auth_name', res.data.name);
+              localStorage.setItem('lk_auth_email', res.data.email);
+              setAuth({ name: res.data.name, email: res.data.email });
+            }
+          } catch (e) {
+            console.error('Google login failed', e);
+          }
+        }
+      });
+      // @ts-ignore
+      window.google.accounts.id.prompt();
+    } else {
+      console.error('Google Identity Services not loaded');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('lk_auth_token');
+    localStorage.removeItem('lk_auth_name');
+    localStorage.removeItem('lk_auth_email');
+    setAuth(null);
   };
 
   return (
@@ -3077,217 +3119,162 @@ function MapDisplay() {
                 </h4>
                 
                 <form onSubmit={handleReviewSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <input 
-                        name="name" 
-                        value={reviewForm.name} 
-                        onChange={handleReviewInput} 
-                        placeholder="Your Name" 
-                        style={{ 
-                          width: '100%', 
-                          padding: '8px 12px', 
-                          borderRadius: 6, 
-                          border: '1px solid #ddd', 
-                          fontSize: 13,
-                          transition: 'border-color 0.2s, box-shadow 0.2s',
-                          outline: 'none'
-                        }} 
-                        onFocus={e => {
-                          (e.target as HTMLInputElement).style.borderColor = '#007bff';
-                          (e.target as HTMLInputElement).style.boxShadow = '0 0 0 2px rgba(0,123,255,0.1)';
-                        }}
-                        onBlur={e => {
-                          (e.target as HTMLInputElement).style.borderColor = '#ddd';
-                          (e.target as HTMLInputElement).style.boxShadow = 'none';
-                        }}
-                        required 
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <input 
-                        name="email" 
-                        value={reviewForm.email} 
-                        onChange={handleReviewInput} 
-                        placeholder="Your Email" 
-                        type="email" 
-                        style={{ 
-                          width: '100%', 
-                          padding: '8px 12px', 
-                          borderRadius: 6, 
-                          border: '1px solid #ddd', 
-                          fontSize: 13,
-                          transition: 'border-color 0.2s, box-shadow 0.2s',
-                          outline: 'none'
-                        }} 
-                        onFocus={e => {
-                          (e.target as HTMLInputElement).style.borderColor = '#007bff';
-                          (e.target as HTMLInputElement).style.boxShadow = '0 0 0 2px rgba(0,123,255,0.1)';
-                        }}
-                        onBlur={e => {
-                          (e.target as HTMLInputElement).style.borderColor = '#ddd';
-                          (e.target as HTMLInputElement).style.boxShadow = 'none';
-                        }}
-                        required 
-                      />
-                    </div>
-                  </div>
-
+                  {!auth && (
+                    <div style={{ color: '#C80B41', fontSize: 13 }}>You must sign in with Google to submit a review.</div>
+                  )}
                   <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    gap: 8,
-                    padding: 12,
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: 6,
-                    border: '1px solid #e9ecef'
+                    border: '1px solid #e9ecef', borderRadius: 8, padding: 12, background: '#fff'
                   }}>
-                    <div style={{ 
-                      fontSize: 13, 
-                      fontWeight: 500, 
-                      color: '#2c3e50',
-                      marginBottom: 4
-                    }}>
-                      Rate your experience:
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <input 
+                          name="name" 
+                          value={reviewForm.name} 
+                          onChange={handleReviewInput} 
+                          placeholder="Your Name" 
+                          style={{ 
+                            width: '100%', padding: 10, border: '1px solid #e9ecef', borderRadius: 8,
+                            outline: 'none', fontSize: 14
+                          }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <input 
+                          name="email" 
+                          value={reviewForm.email} 
+                          onChange={handleReviewInput} 
+                          placeholder="Your Email" 
+                          type="email" 
+                          style={{ 
+                            width: '100%', padding: 10, border: '1px solid #e9ecef', borderRadius: 8,
+                            outline: 'none', fontSize: 14
+                          }}
+                        />
+                      </div>
                     </div>
+
                     <div style={{ 
                       display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 4,
-                      justifyContent: 'center'
+                      flexDirection: 'column',
+                      gap: 8,
+                      padding: 12,
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: 6,
+                      border: '1px solid #e9ecef'
                     }}>
-                      {[1,2,3,4,5].map(star => (
-                        <span 
-                          key={star} 
-                          style={{ 
-                            cursor: 'pointer', 
-                            color: reviewForm.rating >= star ? '#f5b50a' : '#ddd', 
-                            fontSize: 24,
-                            transition: 'color 0.2s, transform 0.1s',
-                            userSelect: 'none'
-                          }} 
-                          onClick={() => handleStarClick(star)}
-                          onMouseEnter={e => {
-                            (e.target as HTMLSpanElement).style.transform = 'scale(1.1)';
-                          }}
-                          onMouseLeave={e => {
-                            (e.target as HTMLSpanElement).style.transform = 'scale(1)';
-                          }}
-                        >
-                          {reviewForm.rating >= star ? '★' : '☆'}
-                        </span>
-                      ))}
-                    </div>
-                    {reviewForm.rating > 0 && (
                       <div style={{ 
-                        textAlign: 'center', 
-                        fontSize: 11, 
-                        color: '#666',
-                        marginTop: 4
+                        fontSize: 13, 
+                        fontWeight: 500, 
+                        color: '#2c3e50',
+                        marginBottom: 4
                       }}>
-                        {reviewForm.rating === 1 && "Poor"}
-                        {reviewForm.rating === 2 && "Fair"}
-                        {reviewForm.rating === 3 && "Good"}
-                        {reviewForm.rating === 4 && "Very Good"}
-                        {reviewForm.rating === 5 && "Excellent"}
+                        Rate your experience:
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 4,
+                        justifyContent: 'center'
+                      }}>
+                        {[1,2,3,4,5].map(star => (
+                          <span 
+                            key={star} 
+                            style={{ 
+                              cursor: 'pointer', 
+                              color: reviewForm.rating >= star ? '#f5b50a' : '#ddd', 
+                              fontSize: 24,
+                              transition: 'color 0.2s, transform 0.1s',
+                              userSelect: 'none'
+                            }} 
+                            onClick={() => handleStarClick(star)}
+                            onMouseEnter={e => {
+                              (e.target as HTMLSpanElement).style.transform = 'scale(1.1)';
+                            }}
+                            onMouseLeave={e => {
+                              (e.target as HTMLSpanElement).style.transform = 'scale(1)';
+                            }}
+                          >
+                            {reviewForm.rating >= star ? '★' : '☆'}
+                          </span>
+                        ))}
+                      </div>
+                      {reviewForm.rating > 0 && (
+                        <div style={{ 
+                          textAlign: 'center', 
+                          fontSize: 11, 
+                          color: '#666',
+                          marginTop: 4
+                        }}>
+                          {reviewForm.rating === 1 && "Poor"}
+                          {reviewForm.rating === 2 && "Fair"}
+                          {reviewForm.rating === 3 && "Good"}
+                          {reviewForm.rating === 4 && "Very Good"}
+                          {reviewForm.rating === 5 && "Excellent"}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <textarea 
+                        name="comment" 
+                        value={reviewForm.comment} 
+                        onChange={handleReviewInput} 
+                        placeholder="Share your experience (optional)" 
+                        style={{ 
+                          width: '100%', 
+                          padding: '8px 12px', 
+                          borderRadius: 6, 
+                          border: '1px solid #ddd', 
+                          fontSize: 13, 
+                          minHeight: 60,
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                          transition: 'border-color 0.2s, box-shadow 0.2s',
+                          outline: 'none'
+                        }} 
+                        onFocus={e => {
+                          (e.target as HTMLTextAreaElement).style.borderColor = '#007bff';
+                          (e.target as HTMLTextAreaElement).style.boxShadow = '0 0 0 2px rgba(0,123,255,0.1)';
+                        }}
+                        onBlur={e => {
+                          (e.target as HTMLTextAreaElement).style.borderColor = '#ddd';
+                          (e.target as HTMLTextAreaElement).style.boxShadow = 'none';
+                        }}
+                      />
+                    </div>
+
+                    {reviewError && (
+                      <div style={{ 
+                        color: '#dc3545', 
+                        fontSize: 12, 
+                        backgroundColor: '#f8d7da',
+                        padding: 8,
+                        borderRadius: 4,
+                        border: '1px solid #f5c6cb'
+                      }}>
+                        {reviewError}
                       </div>
                     )}
-                  </div>
 
-                  <div>
-                    <textarea 
-                      name="comment" 
-                      value={reviewForm.comment} 
-                      onChange={handleReviewInput} 
-                      placeholder="Share your experience (optional)" 
-                      style={{ 
-                        width: '100%', 
-                        padding: '8px 12px', 
-                        borderRadius: 6, 
-                        border: '1px solid #ddd', 
-                        fontSize: 13, 
-                        minHeight: 60,
-                        resize: 'vertical',
-                        fontFamily: 'inherit',
-                        transition: 'border-color 0.2s, box-shadow 0.2s',
-                        outline: 'none'
-                      }} 
-                      onFocus={e => {
-                        (e.target as HTMLTextAreaElement).style.borderColor = '#007bff';
-                        (e.target as HTMLTextAreaElement).style.boxShadow = '0 0 0 2px rgba(0,123,255,0.1)';
-                      }}
-                      onBlur={e => {
-                        (e.target as HTMLTextAreaElement).style.borderColor = '#ddd';
-                        (e.target as HTMLTextAreaElement).style.boxShadow = 'none';
-                      }}
-                    />
-                  </div>
-
-                  {reviewError && (
-                    <div style={{ 
-                      color: '#dc3545', 
-                      fontSize: 12, 
-                      backgroundColor: '#f8d7da',
-                      padding: 8,
-                      borderRadius: 4,
-                      border: '1px solid #f5c6cb'
-                    }}>
-                      {reviewError}
+                    <div style={{ textAlign: 'center' }}>
+                      <button 
+                        type="submit"
+                        disabled={submitting || reviewForm.rating === 0 || !auth}
+                        style={{ 
+                          display: 'inline-flex', alignItems: 'center', gap: 8,
+                          background: submitting ? '#999' : '#2c3e50', color: '#fff', border: 'none',
+                          padding: '10px 16px', borderRadius: 8, cursor: submitting ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {submitting ? 'Submitting...' : (
+                          <>
+                            <span style={{ fontSize: 16 }}>📝</span>
+                            Submit Review
+                          </>
+                        )}
+                      </button>
                     </div>
-                  )}
-
-                  <button 
-                    type="submit" 
-                    disabled={submitting || reviewForm.rating === 0} 
-                    style={{ 
-                      width: '100%', 
-                      background: submitting || reviewForm.rating === 0 ? '#6c757d' : '#007bff', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: 6, 
-                      padding: '10px 16px', 
-                      fontWeight: 600, 
-                      fontSize: 14, 
-                      cursor: submitting || reviewForm.rating === 0 ? 'not-allowed' : 'pointer',
-                      opacity: submitting || reviewForm.rating === 0 ? 0.7 : 1,
-                      transition: 'background-color 0.2s, transform 0.1s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6
-                    }}
-                    onMouseEnter={e => {
-                      if (!submitting && reviewForm.rating > 0) {
-                        (e.target as HTMLButtonElement).style.backgroundColor = '#0056b3';
-                        (e.target as HTMLButtonElement).style.transform = 'translateY(-1px)';
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      if (!submitting && reviewForm.rating > 0) {
-                        (e.target as HTMLButtonElement).style.backgroundColor = '#007bff';
-                        (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
-                      }
-                    }}
-                  >
-                    {submitting ? (
-                      <>
-                        <span style={{ 
-                          width: 12, 
-                          height: 12, 
-                          border: '2px solid #fff', 
-                          borderTop: '2px solid transparent', 
-                          borderRadius: '50%', 
-                          animation: 'spin 1s linear infinite' 
-                        }}></span>
-                        Submitting...
-                      </>
-                    ) : (
-                      <>
-                        <span style={{ fontSize: 16 }}>📝</span>
-                        Submit Review
-                      </>
-                    )}
-                  </button>
+                  </div>
                 </form>
               </div>
             </div>

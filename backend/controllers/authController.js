@@ -5,6 +5,9 @@ const { validationResult } = require("express-validator");
 
 const bcrypt = require("bcryptjs"); //decrypting password
 const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require('google-auth-library');
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 ///////////////////    registerUser      ///////////////////
 
@@ -83,6 +86,39 @@ const registerUser = async (req, res) => {
       msg: "Error registering user",
       error: error.message,
     });
+  }
+};
+
+//////////////////   GOOGLE LOGIN (ID TOKEN)   //////////////////////
+const googleLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body || {};
+    if (!idToken) {
+      return res.status(400).json({ success: false, msg: 'Missing Google idToken' });
+    }
+
+    if (!googleClient) {
+      return res.status(500).json({ success: false, msg: 'Google client not configured' });
+    }
+
+    // Verify Google ID token
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+    const email = payload.email;
+    const name = payload.name || email.split('@')[0];
+
+    if (!email) {
+      return res.status(400).json({ success: false, msg: 'Google token missing email' });
+    }
+
+    // Create a lightweight auth token for customers (not vendors)
+    const userPayload = { user: { email, name, role: 'customer' } };
+    const token = jwt.sign(userPayload, process.env.ACCESS_SECRET_TOKEN || 'access-secret-token', { expiresIn: '7d' });
+
+    return res.status(200).json({ success: true, data: { accessToken: token, name, email } });
+  } catch (error) {
+    console.error('Google login error:', error);
+    return res.status(401).json({ success: false, msg: 'Invalid Google token', error: error.message });
   }
 };
 
@@ -385,5 +421,6 @@ module.exports = {
   loginUser,
   getProfile,
   getAllUsers, 
-  updateProfile 
+  updateProfile, 
+  googleLogin,
 };
