@@ -112,12 +112,19 @@ export const handleApiResponse = async <T>(promise: Promise<{ data: { data: T } 
 // API methods
 export const api = {
   getAllUsers: () => handleApiResponse<Vendor[]>(apiClient.get('/api/all-users')),
+  googleLogin: (idToken: string) => handleApiResponse<{ accessToken: string; name: string; email: string }>(
+    apiClient.post('/api/google-login', { idToken })
+  ),
   login: (credentials: { email: string; password: string }) => 
     handleApiResponse<{ accessToken: string }>(apiClient.post('/api/login', credentials)),
   register: (userData: Omit<Vendor, '_id'>) => 
     handleApiResponse<Vendor>(apiClient.post('/api/register', userData)),
   getReviews: (vendorId: string) => handleApiResponse<Review[]>(apiClient.get(`/api/reviews?vendorId=${vendorId}`)),
-  addReview: (review: Omit<Review, '_id' | 'createdAt'>) => handleApiResponse<Review>(apiClient.post('/api/reviews', review)),
+  addReview: (review: Omit<Review, '_id' | 'createdAt'>) => handleApiResponse<Review>(apiClient.post('/api/reviews', review, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('lk_auth_token') || ''}`
+    }
+  })),
   // Add other API methods as needed
 };
 

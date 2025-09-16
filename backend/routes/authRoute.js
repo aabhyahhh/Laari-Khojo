@@ -13,6 +13,7 @@
     // Use authController.registerUser properly
     router.post("/register", registerValidator, authController.registerUser);
     router.post("/login", loginValidator, authController.loginUser);
+    router.post("/google-login", authController.googleLogin);
 
 
     //authenticating routes
